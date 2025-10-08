@@ -1,4 +1,4 @@
-# Weather Prediction with Customized Loss Function
+# Physics-Informed Machine Learning for Climate Prediction
 
 Code repo for the course project of Group 1, ECE-8936/ENGI-9882/COMP-6936 course
 ---
