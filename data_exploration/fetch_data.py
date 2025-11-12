@@ -38,4 +38,4 @@ request = {
 
 target = f"{dataset}.nc"  # Output file. Adapt as you wish.
 
-client.retrieve(dataset, request, target).download()
+client.retrieve(dataset, request, target)
