@@ -2,9 +2,6 @@ import cdsapi
 
 client = cdsapi.Client()
 
-# url = "https://cds.climate.copernicus.eu/api"
-# key = "af5cf5da-e411-409a-a71f-0727a8e9200a"
-
 dataset = "reanalysis-era5-pressure-levels"
 request = {
     "product_type": ["reanalysis"],
