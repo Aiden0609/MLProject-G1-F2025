@@ -8,6 +8,14 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import geopandas as gpd
 
 
+def filter_all_data(*datasets: Dataset, **filters):
+    filtered_datasets = []
+    for dataset in datasets:
+        filtered_datasets.append(dataset.sel(**filters))
+
+    return filtered_datasets
+
+
 def _make_Ramp(ramp_colors):
     from matplotlib.colors import LinearSegmentedColormap
 
