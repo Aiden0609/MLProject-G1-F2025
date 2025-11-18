@@ -1,0 +1,26 @@
+Job Started on Tue Nov 18 05:22:34 PST 2025
+Tue Nov 18 05:22:34 2025       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.65.06              Driver Version: 580.65.06      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H100 80GB HBM3          On  |   00000000:0C:00.0 Off |                    0 |
+| N/A   22C    P0             67W /  700W |       0MiB /  81559MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+Total Parameters in Aurora Pretrained: 1256300176
+Trainable Parameters in Aurora Pretrained: 1256300176
+Total Parameters in Aurora Small Pretrained: 112797584
+Trainable Parameters in Aurora Small Pretrained: 112797584
+Job finished on Tue Nov 18 05:26:36 PST 2025
