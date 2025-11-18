@@ -8,8 +8,8 @@ from mpl_toolkits import basemap
 from utils import plot, plot_rectangle
 
 filepath_instant = "reanalysis-era5-single-levels/instant.nc"
-filepath_accum = "reanalysis-era5-single-levels/accum.nc"
-filepath_wave_instant = "reanalysis-era5-single-levels/wave_instant.nc"
+filepath_accum = "reanalysis-era5-single-levels/accumulated.nc"
+filepath_wave_instant = "reanalysis-era5-single-levels/bil_remapped_wave_instant.nc"
 
 
 fig = plt.figure(figsize=(16, 9))
@@ -41,8 +41,10 @@ with xr.open_dataset(
     #     }
     # )
     extent = (-60, -24, 66, 48)
-    long = torch.from_numpy(era5_instant.variables["longitude"].values)
-    lat = torch.from_numpy(era5_instant.variables["latitude"].values)
+    # long = torch.from_numpy(era5_instant.variables["longitude"].values)
+    # lat = torch.from_numpy(era5_instant.variables["latitude"].values)
+    long = era5_instant.variables["longitude"].values
+    lat = era5_instant.variables["latitude"].values
     # lat_grid, long_grid = torch.meshgrid(lat, long)
     lat_grid, long_grid = np.meshgrid(
         era5_instant.variables["latitude"].values,
@@ -50,6 +52,7 @@ with xr.open_dataset(
     )
 
     sst = torch.from_numpy(era5_instant.variables["sst"].values[0])
+    # sst = torch.from_numpy(era5_instant.variables["skt"].values[0])
     t2m = torch.from_numpy(era5_instant.variables["t2m"].values[0])
     u10_x = torch.from_numpy(era5_instant.variables["u10"].values[0])
     u10_y = torch.from_numpy(era5_instant.variables["v10"].values[0])
@@ -58,39 +61,21 @@ with xr.open_dataset(
     long_wave = torch.from_numpy(era5_wave_instant.variables["longitude"].values)
     lat_wave = torch.from_numpy(era5_wave_instant.variables["latitude"].values)
     lat_wave_grid, long_wave_grid = torch.meshgrid(lat_wave, long_wave)
-    rhoao_regridded = basemap.interp(
-        era5_wave_instant.variables["rhoao"].values[0, ::-1],
-        # long_wave_grid,
-        # torch.flip(lat_wave_grid, dims=(0,)),
-        long_wave,
-        torch.flip(lat_wave, dims=(0,)),
-        long_grid,
-        # torch.flip(lat_grid, dims=(0,)),
-        np.flip(lat_grid, axis=0),
-        # long,
-        # lat,
-        order=1,
-    )[::-1]
-    rhoao = torch.from_numpy(rhoao_regridded)
-    # rhoao = torch.nn.functional.interpolate(
-    #     torch.from_numpy(era5_wave_instant.variables["rhoao"].values), sst.shape
-    # )[0]
-    print(sst.shape, t2m.shape, u10.shape, rhoao.shape)
-    quit()
-    # custom_sh = sensible_heat(sst, t2m, u10, rhoao)
-    # ishf = torch.from_numpy(era5_accum.variables["ishf"].values[0])
-    # plot(
-    #     long,
-    #     lat,
-    #     custom_sh - ishf,
-    #     fig=fig,
-    #     ax=ax,
-    #     # title="Surface 2m air temperature",
-    #     title="Surface sea temperature",
-    #     cbar_label=r"Temperature $[C\degree]$",
-    #     continent_overlay=True,
-    # )
-    # plot_rectangle(extent, ax)
+    rhoao = torch.from_numpy(era5_wave_instant.variables["rhoao"].values[0])
+    custom_sh = sensible_heat(sst, t2m, u10, rhoao)
+    ishf = torch.from_numpy(era5_instant.variables["ishf"].values[0])
+    plot(
+        long,
+        lat,
+        (custom_sh - ishf).numpy(),
+        fig=fig,
+        ax=ax,
+        # title="Surface 2m air temperature",
+        title="Sensible heat diff",
+        # cbar_label=r"Temperature $[C\degree]$",
+        continent_overlay=True,
+    )
+    plot_rectangle(extent, ax)
     # metadata = Metadata(
     #     lat=torch.from_numpy(era5_instant.variables["latitude"].values),
     #     long=torch.from_numpy(era5_instant.variables["longitude"].values),
@@ -100,3 +85,4 @@ with xr.open_dataset(
     #         .tolist()[1],
     #     ),
     # )
+plt.show()
