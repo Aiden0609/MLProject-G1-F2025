@@ -3,6 +3,8 @@ anyio==4.11.0
 attrs==25.4.0
 azure-core==1.36.0
 azure-storage-blob==12.27.1
+basemap==2.0.0
+basemap_data==2.0.0
 cdsapi==0.7.7
 certifi==2025.10.5
 cffi==2.0.0
@@ -60,6 +62,7 @@ pydantic_core==2.41.5
 pyogrio==0.11.1
 pyparsing==3.2.5
 pyproj==3.7.2
+pyshp==2.3.1
 python-dateutil==2.9.0.post0
 pytz==2025.2
 PyYAML==6.0.3
