@@ -3,7 +3,8 @@ import numpy as np
 import xarray as xr
 from xarray import Dataset, Variable
 import matplotlib.pyplot as plt
-from matplotlib.colors import LightSource
+from matplotlib import cm
+from matplotlib.colors import LightSource, Normalize
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import geopandas as gpd
 
@@ -64,13 +65,20 @@ def plot(
     ax: plt.Axes,
     title: str = None,
     cbar_label: str = None,
+    cbar_limits: tuple[float, float] = None,
     continent_overlay: bool = False,
 ):
     extent = get_extent(x, y)
-    img = ax.imshow(data, origin="upper", extent=extent, cmap=cmocean.cm.thermal)
+    norm = Normalize(vmin=np.min(data), vmax=np.max(data))
+    if cbar_limits is not None:
+        cbar_min, cbar_max = cbar_limits
+        norm = Normalize(vmin=cbar_min, vmax=cbar_max)
+    img = ax.imshow(
+        data, origin="upper", extent=extent, cmap=cmocean.cm.thermal, norm=norm
+    )
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(img, cax=cax)
+    cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmocean.cm.thermal), cax=cax)
     if continent_overlay:
         global world
         if world is None:

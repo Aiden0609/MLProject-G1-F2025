@@ -3,7 +3,6 @@ import torch
 import xarray as xr
 import numpy as np
 from aurora import Batch, Metadata
-from mpl_toolkits import basemap
 
 from utils import plot, plot_rectangle, filter_all_data
 
@@ -17,8 +16,9 @@ def sensible_heat(
     t2m: torch.Tensor,
     u10: torch.Tensor,
     rhoao: torch.Tensor,
-    cp: float = 1.006,
+    cp: float = 1.006e3,  # 1.006kJ
     cs: float = 1e-3,
+    # cs: float = 0.9e-3,
 ):
     return rhoao * cp * cs * u10 * (sst - t2m)
 
@@ -56,7 +56,10 @@ with xr.open_dataset(
     )
 
     sst = torch.from_numpy(era5_instant.variables["sst"].values)
-    # sst = torch.from_numpy(era5_instant.variables["skt"].values)
+    skt = torch.from_numpy(era5_instant.variables["skt"].values)
+
+    # sst = (sst + skt) / 2
+    # sst = skt
     t2m = torch.from_numpy(era5_instant.variables["t2m"].values)
     u10_x = torch.from_numpy(era5_instant.variables["u10"].values)
     u10_y = torch.from_numpy(era5_instant.variables["v10"].values)
@@ -67,15 +70,18 @@ with xr.open_dataset(
     lat_wave_grid, long_wave_grid = torch.meshgrid(lat_wave, long_wave)
     rhoao = torch.from_numpy(era5_wave_instant.variables["rhoao"].values)
     custom_sh = sensible_heat(sst, t2m, u10, rhoao)
+    custom_sh_w_skt = sensible_heat(skt, t2m, u10, rhoao)
+
     ishf = torch.from_numpy(era5_instant.variables["ishf"].values)
+    ishf = torch.where(custom_sh.isnan(), torch.nan, ishf)
 
     fig = plt.figure(figsize=(16, 9))
     ax = fig.add_subplot()
     plot(
         long,
         lat,
-        # (abs(custom_sh - ishf) / ishf).numpy(),
-        ishf.numpy(),
+        (abs(-custom_sh - ishf) / ishf).numpy(),
+        # (-custom_sh_w_skt / ishf).numpy(),
         # (custom_sh - ishf).numpy(),
         fig=fig,
         ax=ax,
@@ -84,23 +90,44 @@ with xr.open_dataset(
         title="Given sensible heat",
         # cbar_label=r"Temperature $[C\degree]$",
         continent_overlay=True,
+        # cbar_limits=(100, -300),
+        cbar_limits=(1, -1),
     )
     plot_rectangle(extent, ax)
-    fig = plt.figure(figsize=(16, 9))
-    ax = fig.add_subplot()
-    plot(
-        long,
-        lat,
-        # (abs(custom_sh - ishf) / ishf).numpy(),
-        # (custom_sh - ishf).numpy(),
-        -custom_sh.numpy(),
-        fig=fig,
-        ax=ax,
-        # title="Surface 2m air temperature",
-        # title="Sensible heat rel error",
-        title="Calculated sensible heat",
-        # cbar_label=r"Temperature $[C\degree]$",
-        continent_overlay=True,
-    )
-    plot_rectangle(extent, ax)
+    # fig = plt.figure(figsize=(16, 9))
+    # ax = fig.add_subplot()
+    # plot(
+    #     long,
+    #     lat,
+    #     # (abs(custom_sh - ishf) / ishf).numpy(),
+    #     # (custom_sh - ishf).numpy(),
+    #     -custom_sh.numpy(),
+    #     fig=fig,
+    #     ax=ax,
+    #     # title="Surface 2m air temperature",
+    #     # title="Sensible heat rel error",
+    #     title="Calculated sensible heat",
+    #     # cbar_label=r"Temperature $[C\degree]$",
+    #     continent_overlay=True,
+    #     cbar_limits=(100, -300),
+    # )
+    # fig = plt.figure(figsize=(16, 9))
+    # ax = fig.add_subplot()
+    # custom_sh = sensible_heat(skt, t2m, u10, rhoao)
+    # plot(
+    #     long,
+    #     lat,
+    #     # (abs(custom_sh - ishf) / ishf).numpy(),
+    #     # (custom_sh - ishf).numpy(),
+    #     -custom_sh_w_skt.numpy(),
+    #     fig=fig,
+    #     ax=ax,
+    #     # title="Surface 2m air temperature",
+    #     # title="Sensible heat rel error",
+    #     title="Calculated sensible heat (using skin temperature)",
+    #     # cbar_label=r"Temperature $[C\degree]$",
+    #     continent_overlay=True,
+    #     cbar_limits=(100, -300),
+    # )
+    # plot_rectangle(extent, ax)
     plt.show()
