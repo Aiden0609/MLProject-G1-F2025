@@ -69,7 +69,7 @@ def plot(
     continent_overlay: bool = False,
 ):
     extent = get_extent(x, y)
-    norm = Normalize(vmin=np.min(data), vmax=np.max(data))
+    norm = Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
     if cbar_limits is not None:
         cbar_min, cbar_max = cbar_limits
         norm = Normalize(vmin=cbar_min, vmax=cbar_max)
