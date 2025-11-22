@@ -3,7 +3,8 @@ from matplotlib import pyplot as plt
 import torch
 import xarray as xr
 import numpy as np
-from aurora import Batch, Metadata
+
+# from aurora import Batch, Metadata
 
 from utils import plot, plot_rectangle, filter_all_data
 
@@ -66,7 +67,7 @@ def sensible_heat(
     cs: float = 1e-3,
     # cs: float = 0.9e-3,
 ):
-    return rhoao * cp * cs * u10 * (sst - t2m)
+    return -rhoao * cp * cs * u10 * (sst - t2m)
 
 
 with xr.open_dataset(
@@ -159,7 +160,7 @@ with xr.open_dataset(
         lat,
         # (abs(custom_sh - ishf) / ishf).numpy(),
         # (custom_sh - ishf).numpy(),
-        -custom_sh.numpy(),
+        custom_sh.numpy(),
         # -delta_custom_sh.numpy(),
         # ishf.numpy(),
         fig=fig,
