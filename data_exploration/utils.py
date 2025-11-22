@@ -4,8 +4,14 @@ import xarray as xr
 from xarray import Dataset, Variable
 import matplotlib.pyplot as plt
 from matplotlib import cm
-from matplotlib.colors import LightSource, Normalize
+from matplotlib.colors import (
+    LightSource,
+    Normalize,
+    LinearSegmentedColormap,
+    BoundaryNorm,
+)
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 import geopandas as gpd
 
 
@@ -66,19 +72,37 @@ def plot(
     title: str = None,
     cbar_label: str = None,
     cbar_limits: tuple[float, float] = None,
+    cbar_discrete: bool = False,
     continent_overlay: bool = False,
 ):
-    extent = get_extent(x, y)
+    cmap = cmocean.cm.thermal
     norm = Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
-    if cbar_limits is not None:
-        cbar_min, cbar_max = cbar_limits
-        norm = Normalize(vmin=cbar_min, vmax=cbar_max)
-    img = ax.imshow(
-        data, origin="upper", extent=extent, cmap=cmocean.cm.thermal, norm=norm
-    )
+    if cbar_discrete:
+        # extract all colors from the .jet map
+        cmaplist = [cmap(i) for i in range(cmap.N)]
+        cmaplist = cmaplist[:: len(cmaplist) // 7]
+        # create the new map
+        cmap = LinearSegmentedColormap.from_list("Custom cmap", cmaplist, cmap.N)
+
+        if cbar_limits is not None:
+            cbar_min = min(cbar_limits)
+            cbar_max = max(cbar_limits)
+        else:
+            cbar_min = np.nanmin(data)
+            cbar_max = np.nanmax(data)
+        bounds = np.linspace(cbar_min, cbar_max, len(cmaplist))
+
+        norm = BoundaryNorm(bounds, cmap.N)
+    else:
+        if cbar_limits is not None:
+            cbar_min, cbar_max = cbar_limits
+            norm = Normalize(vmin=cbar_min, vmax=cbar_max)
+
+    extent = get_extent(x, y)
+    img = ax.imshow(data, origin="upper", extent=extent, cmap=cmap, norm=norm)
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmocean.cm.thermal), cax=cax)
+    cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), cax=cax)
     if continent_overlay:
         global world
         if world is None:

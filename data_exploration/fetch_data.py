@@ -46,6 +46,7 @@ instant_variables = [
     "10m_u_component_of_wind",
     "10m_v_component_of_wind",
     "instantaneous_surface_sensible_heat_flux",
+    "instantaneous_10m_wind_gust",
     # "2m_dewpoint_temperature",
     # "mean_sea_level_pressure",
     # "surface_pressure",
@@ -64,10 +65,18 @@ accumulated_variables = [
     "surface_sensible_heat_flux",
     "surface_net_thermal_radiation",
 ]
+hydrological_variables = [
+    "potential_evaporation",
+    "runoff",
+    "volumetric_soil_water_layer_1",
+    "volumetric_soil_water_layer_2",
+    "volumetric_soil_water_layer_3",
+]
 variables = {
-    "instant": instant_variables,
-    "wave_instant": wave_instant_variables,
+    # "instant": instant_variables,
+    # "wave_instant": wave_instant_variables,
     # "accumulated": accumulated_variables,
+    "hydrological": hydrological_variables,
 }
 for name, variable in variables.items():
     name = name + "_full_year"
@@ -75,9 +84,9 @@ for name, variable in variables.items():
         "product_type": ["reanalysis"],
         "variable": variable,
         "year": ["2023"],
-        "month": ["01", "4", "7", "11"],
+        "month": ["01", "04", "07", "11"],
         # "day": ["01", "02", "03"],
-        "day": ["01", "8", "15", "24"],
+        "day": ["01", "08", "15", "24"],
         # "time": ["00:00", "06:00", "12:00", "18:00"],
         "time": ["06:00", "18:00"],
         "data_format": "netcdf",
@@ -90,7 +99,8 @@ for name, variable in variables.items():
 
     client.retrieve(dataset, request).download(target)
     if name.startswith("wave_instant"):
-        cwd = os.getcwd()
+
+        # cwd = os.getcwd()
         os.system(
             f"cdo remapbil,{dataset}/instant.nc {target} {dataset}/bil_remapped_{name}.nc"
         )

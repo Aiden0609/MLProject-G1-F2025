@@ -41,7 +41,8 @@ def prepare_data(
     era5_accum = accumulated_flux_to_watts(era5_accum, {"sshf": "instant_sshf"})
     # Need to drop the very first time point
 
-    era5_instant, era5_accum, era5_wave_instant = filter_all_data(
+    era5_instant, _, era5_wave_instant = filter_all_data(
+        # era5_instant, era5_accum, era5_wave_instant = filter_all_data(
         era5_instant,
         era5_accum,
         era5_wave_instant,
@@ -50,7 +51,8 @@ def prepare_data(
         # valid_time=slice("2023-01-01T06", "2023-01-03T18"),
         # valid_time="2023-01-01T06",
         # valid_time="2023-01-01T18",
-        valid_time="2023-01",
+        # valid_time="2023-07",
+        valid_time=slice("2023-07", "2023-08"),
     )
     era5_instant = era5_instant.mean("valid_time")
     era5_wave_instant = era5_wave_instant.mean("valid_time")
@@ -77,9 +79,6 @@ with xr.open_dataset(
 ) as era5_accum, xr.open_dataset(
     filepath_wave_instant, engine="netcdf4"
 ) as era5_wave_instant:
-    for key, val in era5_instant.variables["ishf"].attrs.items():
-        print(key, ": ", val)
-    quit()
     era5_instant, era5_accum, era5_wave_instant = prepare_data(
         era5_instant, era5_accum, era5_wave_instant
     )
@@ -100,16 +99,16 @@ with xr.open_dataset(
         era5_instant.variables["longitude"].values,
     )
     istl1 = torch.from_numpy(era5_instant.variables["istl1"].values)
-    ci = torch.from_numpy(era5_instant.variables["ci"].values)  # sea ice cover
+    ci = torch.from_numpy(era5_instant.variables["siconc"].values)  # sea ice cover
 
-    sst = torch.from_numpy(era5_instant.variables["sst"].values)
-    skt = torch.from_numpy(era5_instant.variables["skt"].values)
+    sst = torch.from_numpy(era5_instant.variables["sst"].values) - 273
+    skt = torch.from_numpy(era5_instant.variables["skt"].values) - 273
 
-    sst = ci * istl1 + (1 - ci) * sst
+    # sst = ci * istl1 + (1 - ci) * sst
 
     # sst = (sst + skt) / 2
     # sst = skt
-    t2m = torch.from_numpy(era5_instant.variables["t2m"].values)
+    t2m = torch.from_numpy(era5_instant.variables["t2m"].values) - 273
     u10_x = torch.from_numpy(era5_instant.variables["u10"].values)
     u10_y = torch.from_numpy(era5_instant.variables["v10"].values)
     u10 = torch.sqrt(u10_x**2 + u10_y**2)
@@ -127,7 +126,93 @@ with xr.open_dataset(
     delta_ishf = ishf - torch.roll(ishf, 1)
 
     fig = plt.figure(figsize=(16, 9))
-    ax = fig.add_subplot()
+    # ax = fig.add_subplot()
+    # ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = fig.subplots(3, 2, sharex=True, sharey=True)
+    ((ax1, ax2), (ax3, ax4)) = fig.subplots(2, 2, sharex=True, sharey=True)
+    # plot(
+    #     long,
+    #     lat,
+    #     # (abs(-custom_sh - ishf) / ishf).numpy(),
+    #     # (-custom_sh_w_skt / ishf).numpy(),
+    #     # (custom_sh - ishf).numpy(),
+    #     # 10 * ishf.numpy(),
+    #     # ishf.numpy(),
+    #     # rhoao.numpy(),
+    #     sst.numpy(),
+    #     # delta_ishf.numpy(),
+    #     fig=fig,
+    #     ax=ax1,
+    #     # title="Surface 2m air temperature",
+    #     # title="Sensible heat rel error",
+    #     # title="Given sensible heat",
+    #     # title="Air density",
+    #     title="sst",
+    #     # cbar_label=r"Temperature $[C\degree]$",
+    #     continent_overlay=True,
+    #     # cbar_limits=(100, -300),
+    #     # cbar_limits=(30, -30),
+    #     # cbar_limits=(10, -10),
+    #     # cbar_limits=(150, -500),
+    # )
+    # fig = plt.figure(figsize=(16, 9))
+    # ax = fig.add_subplot()
+    # plot(
+    #     long,
+    #     lat,
+    #     # (abs(-custom_sh - ishf) / ishf).numpy(),
+    #     # (-custom_sh_w_skt / ishf).numpy(),
+    #     # (custom_sh - ishf).numpy(),
+    #     # 10 * ishf.numpy(),
+    #     # ishf.numpy(),
+    #     # rhoao.numpy(),
+    #     t2m.numpy(),
+    #     # delta_ishf.numpy(),
+    #     fig=fig,
+    #     ax=ax2,
+    #     # title="Surface 2m air temperature",
+    #     # title="Sensible heat rel error",
+    #     # title="Given sensible heat",
+    #     # title="Air density",
+    #     title="t2m",
+    #     # cbar_label=r"Temperature $[C\degree]$",
+    #     continent_overlay=True,
+    #     # cbar_limits=(100, -300),
+    #     # cbar_limits=(30, -30),
+    #     # cbar_limits=(10, -10),
+    #     # cbar_limits=(150, -500),
+    # )
+    # ishf = torch.from_numpy(era5_instant.variables["ishf"].values)
+    # ishf = torch.where(custom_sh.isnan(), torch.nan, ishf)
+    # plot_rectangle(extent, ax)
+    # fig = plt.figure(figsize=(16, 9))
+    # ax = fig.add_subplot()
+    delta_custom_sh = custom_sh - torch.roll(custom_sh, 1)
+    plot(
+        long,
+        lat,
+        # (abs(custom_sh - ishf) / ishf).numpy(),
+        # (custom_sh - ishf).numpy(),
+        # custom_sh.numpy(),
+        u10.numpy(),
+        # -delta_custom_sh.numpy(),
+        # ishf.numpy(),
+        fig=fig,
+        # ax=ax3,
+        ax=ax1,
+        # title="Surface 2m air temperature",
+        # title="Sensible heat rel error",
+        # title="Calculated sensible heat",
+        title="Wind speed",
+        # cbar_label=r"Temperature $[C\degree]$",
+        continent_overlay=True,
+        # cbar_limits=(150, -500),
+        # cbar_limits=(10, -10),
+    )
+    # plt.show()
+    # quit()
+    # fig = plt.figure(figsize=(16, 9))
+    # ax = fig.add_subplot()
+    # custom_sh = sensible_heat(skt, t2m, u10, rhoao)
     plot(
         long,
         lat,
@@ -135,66 +220,73 @@ with xr.open_dataset(
         # (-custom_sh_w_skt / ishf).numpy(),
         # (custom_sh - ishf).numpy(),
         # 10 * ishf.numpy(),
-        ishf.numpy(),
+        # ishf.numpy(),
+        # rhoao.numpy(),
+        (sst - t2m).numpy(),
         # delta_ishf.numpy(),
         fig=fig,
-        ax=ax,
+        # ax=ax4,
+        ax=ax3,
         # title="Surface 2m air temperature",
         # title="Sensible heat rel error",
-        title="Given sensible heat",
+        # title="Given sensible heat",
+        # title="Air density",
+        title="sst and t2m diff",
         # cbar_label=r"Temperature $[C\degree]$",
         continent_overlay=True,
         # cbar_limits=(100, -300),
         # cbar_limits=(30, -30),
         # cbar_limits=(10, -10),
-        cbar_limits=(150, -500),
+        cbar_limits=(-1, 1),
+        # cbar_limits=(150, -500),
     )
-    # ishf = torch.from_numpy(era5_instant.variables["ishf"].values)
-    # ishf = torch.where(custom_sh.isnan(), torch.nan, ishf)
-    # plot_rectangle(extent, ax)
-    fig = plt.figure(figsize=(16, 9))
-    ax = fig.add_subplot()
-    delta_custom_sh = custom_sh - torch.roll(custom_sh, 1)
     plot(
         long,
         lat,
-        # (abs(custom_sh - ishf) / ishf).numpy(),
-        # (custom_sh - ishf).numpy(),
-        custom_sh.numpy(),
-        # -delta_custom_sh.numpy(),
-        # ishf.numpy(),
-        fig=fig,
-        ax=ax,
-        # title="Surface 2m air temperature",
-        # title="Sensible heat rel error",
-        title="Calculated sensible heat",
-        # cbar_label=r"Temperature $[C\degree]$",
-        continent_overlay=True,
-        cbar_limits=(150, -500),
-        # cbar_limits=(10, -10),
-    )
-    # plt.show()
-    # quit()
-    fig = plt.figure(figsize=(16, 9))
-    ax = fig.add_subplot()
-    # custom_sh = sensible_heat(skt, t2m, u10, rhoao)
-    plot(
-        long,
-        lat,
-        (abs(custom_sh - ishf) / ishf).numpy(),
+        (abs(custom_sh - ishf) / abs(ishf)).numpy(),
         # (abs(delta_custom_sh - delta_ishf) / delta_ishf).numpy(),
         # (custom_sh - ishf).numpy(),
         # -custom_sh_w_skt.numpy(),
         fig=fig,
-        ax=ax,
+        # ax=ax5,
+        ax=ax4,
         # title="Surface 2m air temperature",
         title="Sensible heat rel error",
         # title="Calculated sensible heat (using skin temperature)",
         # cbar_label=r"Temperature $[C\degree]$",
         continent_overlay=True,
         # cbar_limits=(100, -300),
-        cbar_limits=(5, -5),
+        # cbar_limits=(5, -5),
+        cbar_limits=(1, 0),
         # cbar_limits=(10, -10),
+        # cbar_discrete=True,
+    )
+    plot(
+        long,
+        lat,
+        # (abs(-custom_sh - ishf) / ishf).numpy(),
+        # (-custom_sh_w_skt / ishf).numpy(),
+        # (custom_sh - ishf).numpy(),
+        # 10 * ishf.numpy(),
+        # ishf.numpy(),
+        # rhoao.numpy(),
+        (abs(custom_sh - ishf)).numpy(),
+        # delta_ishf.numpy(),
+        fig=fig,
+        # ax=ax4,
+        ax=ax2,
+        # title="Surface 2m air temperature",
+        # title="Sensible heat rel error",
+        # title="Given sensible heat",
+        # title="Air density",
+        title="Sensible heat abs error",
+        # cbar_label=r"Temperature $[C\degree]$",
+        continent_overlay=True,
+        # cbar_limits=(100, -300),
+        # cbar_limits=(30, -30),
+        # cbar_limits=(10, -10),
+        cbar_limits=(0, 10),
+        # cbar_limits=(150, -500),
     )
     # plot_rectangle(extent, ax)
     plt.show()
