@@ -12,7 +12,8 @@ extra_name = ""
 extra_name = "_full_year"
 
 filepath_instant = f"reanalysis-era5-single-levels/instant{extra_name}.nc"
-filepath_accum = "reanalysis-era5-single-levels/accumulated.nc"
+# filepath_accum = "reanalysis-era5-single-levels/accumulated.nc"
+filepath_accum = f"reanalysis-era5-single-levels/flux{extra_name}.nc"
 filepath_wave_instant = (
     f"reanalysis-era5-single-levels/bil_remapped_wave_instant{extra_name}.nc"
 )
@@ -38,10 +39,12 @@ def prepare_data(
     era5_accum: xr.Dataset,
     era5_wave_instant: xr.Dataset,
 ) -> tuple[xr.Dataset, xr.Dataset, xr.Dataset]:
-    era5_accum = accumulated_flux_to_watts(era5_accum, {"sshf": "instant_sshf"})
+    # era5_accum = accumulated_flux_to_watts(
+    #     era5_accum, {"sshf": "instant_sshf"}, time_period=60 * 60
+    # )
     # Need to drop the very first time point
 
-    era5_instant, _, era5_wave_instant = filter_all_data(
+    era5_instant, era5_accum, era5_wave_instant = filter_all_data(
         # era5_instant, era5_accum, era5_wave_instant = filter_all_data(
         era5_instant,
         era5_accum,
@@ -49,14 +52,14 @@ def prepare_data(
         # longitude=slice(-60, -24),
         # latitude=slice(66, 48),
         # valid_time=slice("2023-01-01T06", "2023-01-03T18"),
-        # valid_time="2023-01-01T06",
+        valid_time="2023-01-01T06",
         # valid_time="2023-01-01T18",
-        # valid_time="2023-07",
-        valid_time=slice("2023-07", "2023-08"),
+        # valid_time="2023-01",
+        # valid_time=slice("2023-07", "2023-08"),
     )
-    era5_instant = era5_instant.mean("valid_time")
-    era5_wave_instant = era5_wave_instant.mean("valid_time")
-    era5_accum = era5_accum.mean("valid_time")
+    # era5_instant = era5_instant.mean("valid_time")
+    # era5_wave_instant = era5_wave_instant.mean("valid_time")
+    # era5_accum = era5_accum.mean("valid_time")
     return era5_instant, era5_accum, era5_wave_instant
 
 
@@ -104,6 +107,7 @@ with xr.open_dataset(
     sst = torch.from_numpy(era5_instant.variables["sst"].values) - 273
     skt = torch.from_numpy(era5_instant.variables["skt"].values) - 273
 
+    sst = torch.where(ci > 0.5, torch.nan, sst)
     # sst = ci * istl1 + (1 - ci) * sst
 
     # sst = (sst + skt) / 2
@@ -112,23 +116,21 @@ with xr.open_dataset(
     u10_x = torch.from_numpy(era5_instant.variables["u10"].values)
     u10_y = torch.from_numpy(era5_instant.variables["v10"].values)
     u10 = torch.sqrt(u10_x**2 + u10_y**2)
-    # TODO do this
-    long_wave = torch.from_numpy(era5_wave_instant.variables["longitude"].values)
-    lat_wave = torch.from_numpy(era5_wave_instant.variables["latitude"].values)
-    lat_wave_grid, long_wave_grid = torch.meshgrid(lat_wave, long_wave)
+
     rhoao = torch.from_numpy(era5_wave_instant.variables["rhoao"].values)
     custom_sh = sensible_heat(sst, t2m, u10, rhoao)
     custom_sh_w_skt = sensible_heat(skt, t2m, u10, rhoao)
 
-    ishf = torch.from_numpy(era5_instant.variables["ishf"].values)
+    # ishf = torch.from_numpy(era5_instant.variables["ishf"].values)
     # ishf = torch.from_numpy(era5_accum.variables["instant_sshf"].values)
+    ishf = torch.from_numpy(era5_accum.variables["avg_ishf"].values)
     ishf = torch.where(custom_sh.isnan(), torch.nan, ishf)
     delta_ishf = ishf - torch.roll(ishf, 1)
 
     fig = plt.figure(figsize=(16, 9))
     # ax = fig.add_subplot()
     # ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = fig.subplots(3, 2, sharex=True, sharey=True)
-    ((ax1, ax2), (ax3, ax4)) = fig.subplots(2, 2, sharex=True, sharey=True)
+    ((ax1, ax2), (ax3, ax4), (ax5, _)) = fig.subplots(3, 2, sharex=True, sharey=True)
     # plot(
     #     long,
     #     lat,
@@ -207,6 +209,7 @@ with xr.open_dataset(
         continent_overlay=True,
         # cbar_limits=(150, -500),
         # cbar_limits=(10, -10),
+        cbar_discrete=True,
     )
     # plt.show()
     # quit()
@@ -216,29 +219,42 @@ with xr.open_dataset(
     plot(
         long,
         lat,
+        (sst - t2m).numpy(),
+        fig=fig,
+        # ax=ax4,
+        ax=ax3,
+        title="sst and t2m diff",
+        continent_overlay=True,
+        # cbar_limits=(-3, 3),
+        cbar_discrete=True,
+    )
+    plot(
+        long,
+        lat,
         # (abs(-custom_sh - ishf) / ishf).numpy(),
         # (-custom_sh_w_skt / ishf).numpy(),
         # (custom_sh - ishf).numpy(),
         # 10 * ishf.numpy(),
         # ishf.numpy(),
         # rhoao.numpy(),
-        (sst - t2m).numpy(),
+        rhoao.numpy(),
         # delta_ishf.numpy(),
         fig=fig,
         # ax=ax4,
-        ax=ax3,
+        ax=ax5,
         # title="Surface 2m air temperature",
         # title="Sensible heat rel error",
         # title="Given sensible heat",
         # title="Air density",
-        title="sst and t2m diff",
+        title="Air pressure",
         # cbar_label=r"Temperature $[C\degree]$",
         continent_overlay=True,
         # cbar_limits=(100, -300),
         # cbar_limits=(30, -30),
         # cbar_limits=(10, -10),
-        cbar_limits=(-1, 1),
+        # cbar_limits=(1.2, 1.3),
         # cbar_limits=(150, -500),
+        cbar_discrete=True,
     )
     plot(
         long,
@@ -259,7 +275,7 @@ with xr.open_dataset(
         # cbar_limits=(5, -5),
         cbar_limits=(1, 0),
         # cbar_limits=(10, -10),
-        # cbar_discrete=True,
+        cbar_discrete=True,
     )
     plot(
         long,
@@ -270,7 +286,8 @@ with xr.open_dataset(
         # 10 * ishf.numpy(),
         # ishf.numpy(),
         # rhoao.numpy(),
-        (abs(custom_sh - ishf)).numpy(),
+        # (abs(custom_sh - ishf)).numpy(),
+        (custom_sh - ishf).numpy(),
         # delta_ishf.numpy(),
         fig=fig,
         # ax=ax4,
@@ -279,14 +296,16 @@ with xr.open_dataset(
         # title="Sensible heat rel error",
         # title="Given sensible heat",
         # title="Air density",
-        title="Sensible heat abs error",
+        # title="Sensible heat abs error",
+        title="Sensible heat error",
         # cbar_label=r"Temperature $[C\degree]$",
         continent_overlay=True,
         # cbar_limits=(100, -300),
         # cbar_limits=(30, -30),
         # cbar_limits=(10, -10),
-        cbar_limits=(0, 10),
+        # cbar_limits=(0, 10),
         # cbar_limits=(150, -500),
+        cbar_discrete=True,
     )
     # plot_rectangle(extent, ax)
     plt.show()

@@ -47,6 +47,8 @@ instant_variables = [
     "10m_v_component_of_wind",
     "instantaneous_surface_sensible_heat_flux",
     "instantaneous_10m_wind_gust",
+    "soil_temperature_level_1",
+    "temperature_of_snow_layer",
     # "2m_dewpoint_temperature",
     # "mean_sea_level_pressure",
     # "surface_pressure",
@@ -72,12 +74,33 @@ hydrological_variables = [
     "volumetric_soil_water_layer_2",
     "volumetric_soil_water_layer_3",
 ]
+
+flux_variables = [
+    "mean_surface_direct_short_wave_radiation_flux",
+    "mean_surface_direct_short_wave_radiation_flux_clear_sky",
+    "mean_surface_downward_long_wave_radiation_flux",
+    "mean_surface_downward_long_wave_radiation_flux_clear_sky",
+    "mean_surface_downward_short_wave_radiation_flux",
+    "mean_surface_downward_short_wave_radiation_flux_clear_sky",
+    "mean_surface_downward_uv_radiation_flux",
+    "mean_surface_latent_heat_flux",
+    "mean_surface_net_long_wave_radiation_flux",
+    "mean_surface_net_long_wave_radiation_flux_clear_sky",
+    "mean_surface_net_short_wave_radiation_flux",
+    "mean_surface_net_short_wave_radiation_flux_clear_sky",
+    "mean_surface_sensible_heat_flux",
+]
+invariant_variables = ["land_sea_mask"]
 variables = {
     # "instant": instant_variables,
     # "wave_instant": wave_instant_variables,
     # "accumulated": accumulated_variables,
-    "hydrological": hydrological_variables,
+    # "hydrological": hydrological_variables,
+    # "flux": flux_variables
+    "invariant": invariant_variables,
 }
+
+
 for name, variable in variables.items():
     name = name + "_full_year"
     request = {

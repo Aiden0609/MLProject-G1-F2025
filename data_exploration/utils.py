@@ -15,7 +15,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import geopandas as gpd
 
 
-def filter_all_data(*datasets: Dataset, **filters):
+def filter_all_data(*datasets: Dataset, **filters) -> list[Dataset]:
     filtered_datasets = []
     for dataset in datasets:
         filtered_datasets.append(dataset.sel(**filters))
@@ -61,7 +61,7 @@ def shaded_image(plot_func, ve: float = VE):
 world = None
 
 
-@shaded_image
+# @shaded_image
 def plot(
     x: np.ndarray,
     y: np.ndarray,
@@ -76,7 +76,10 @@ def plot(
     continent_overlay: bool = False,
 ):
     cmap = cmocean.cm.thermal
-    norm = Normalize(vmin=np.nanmin(data), vmax=np.nanmax(data))
+    std = 2 * np.nanstd(data)
+    mean = np.nanmean(data)
+    cbar_min = np.nanmax((np.nanmin(data), mean - std))
+    cbar_max = np.nanmin((np.nanmax(data), mean + std))
     if cbar_discrete:
         # extract all colors from the .jet map
         cmaplist = [cmap(i) for i in range(cmap.N)]
@@ -87,16 +90,13 @@ def plot(
         if cbar_limits is not None:
             cbar_min = min(cbar_limits)
             cbar_max = max(cbar_limits)
-        else:
-            cbar_min = np.nanmin(data)
-            cbar_max = np.nanmax(data)
         bounds = np.linspace(cbar_min, cbar_max, len(cmaplist))
 
         norm = BoundaryNorm(bounds, cmap.N)
     else:
         if cbar_limits is not None:
             cbar_min, cbar_max = cbar_limits
-            norm = Normalize(vmin=cbar_min, vmax=cbar_max)
+        norm = Normalize(vmin=cbar_min, vmax=cbar_max)
 
     extent = get_extent(x, y)
     img = ax.imshow(data, origin="upper", extent=extent, cmap=cmap, norm=norm)
