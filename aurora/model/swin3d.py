@@ -15,12 +15,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-from timm.layers import DropPath, to_3tuple
+from timm.models.layers import DropPath, to_3tuple
 
 from aurora.model.film import AdaptiveLayerNorm
 from aurora.model.fourier import lead_time_expansion
 from aurora.model.lora import LoRAMode, LoRARollout
 from aurora.model.util import init_weights, maybe_adjust_windows
+
+from flash_attn import flash_attn_qkvpacked_func
 
 __all__ = ["Swin3DTransformerBackbone"]
 
@@ -104,8 +106,7 @@ class WindowAttention(nn.Module):
             lora_alpha (int, optional): LoRA alpha. Defaults to `8`.
             lora_dropout (float, optional): LoRA drop-out rate. Defaults to `0.0`.
             lora_steps (int, optional): Maximum number of LoRA roll-out steps. Defaults to `40`.
-            lora_mode (str, optional): LoRA mode. `"single"` uses the same LoRA for all roll-out
-                steps, `"from_second"` uses the same LoRA from the second roll-out step on,
+            lora_mode (str, optional): Mode. `"single"` uses the same LoRA for all roll-out steps,
                 and `"all"` uses a different LoRA for every roll-out step. Defaults to `"single"`.
             use_lora (bool, optional): Enable LoRA. By default, LoRA is disabled.
         """
@@ -156,14 +157,20 @@ class WindowAttention(nn.Module):
         attn_dropout = self.attn_drop if self.training else 0.0
 
         if mask is not None:
+            nW = mask.shape[0]
+            q, k, v = map(lambda t: rearrange(t, "(B nW) H N D -> B nW H N D", nW=nW), (q, k, v))
             mask = mask.unsqueeze(1).unsqueeze(0)  # (1, nW, 1, ws, ws)
-            # Repeat the mask for every batch size and merge `B` and `nW` into one
-            # dimension.
-            B = q.shape[0] // mask.shape[1]
-            mask = mask.repeat(B, 1, 1, 1, 1).reshape(-1, *mask.shape[2:])
             x = F.scaled_dot_product_attention(q, k, v, attn_mask=mask, dropout_p=attn_dropout)
+            x = rearrange(x, "B nW H N D -> (B nW) H N D")
         else:
-            x = F.scaled_dot_product_attention(q, k, v, dropout_p=attn_dropout)
+            ### use flash-attn ###
+            qkv = rearrange(qkv, "qkv B H N D -> B N qkv H D")
+            x = flash_attn_qkvpacked_func(qkv, dropout_p=attn_dropout) # qkv: (batch_size, seqlen, 3, nheads, headdim)
+            x = rearrange(x, "B N H D -> B H N D")
+            ### use flash-attn ###
+            ### use vanilla attn ###
+            # x = F.scaled_dot_product_attention(q, k, v, dropout_p=attn_dropout)
+            ### use vanilla attn ###
 
         x = rearrange(x, "B H N D -> B N (H D)")
         x = self.proj(x) + self.lora_proj(x, rollout_step)
@@ -402,8 +409,7 @@ class Swin3DTransformerBlock(nn.Module):
             scale_bias (float, optional): Scale bias for
                 :class:`aurora.model.film.AdaptiveLayerNorm`. Defaults to `0`.
             lora_steps (int, optional): Maximum number of LoRA roll-out steps. Defaults to `40`.
-            lora_mode (str, optional): LoRA mode. `"single"` uses the same LoRA for all roll-out
-                steps, `"from_second"` uses the same LoRA from the second roll-out step on,
+            lora_mode (str, optional): Mode. `"single"` uses the same LoRA for all roll-out steps,
                 and `"all"` uses a different LoRA for every roll-out step. Defaults to `"single"`.
             use_lora (bool): Enable LoRA. By default, LoRA is disabled.
         """
@@ -476,7 +482,6 @@ class Swin3DTransformerBlock(nn.Module):
         else:
             shifted_x = x
             attn_mask = None
-
         # Pad the input to multiple of window size.
         pad_size = ((-C) % ws[0], (-H) % ws[1], (-W) % ws[2])
         shifted_x = pad_3d(shifted_x, pad_size)
@@ -655,8 +660,7 @@ class BasicLayer3D(nn.Module):
             scale_bias (float, optional): Scale bias for
                 :class:`aurora.model.film.AdaptiveLayerNorm`. Default: 0
             lora_steps (int, optional): Maximum number of LoRA roll-out steps. Defaults to `40`.
-            lora_mode (str, optional): LoRA mode. `"single"` uses the same LoRA for all roll-out
-                steps, `"from_second"` uses the same LoRA from the second roll-out step on,
+            lora_mode (str, optional): Mode. `"single"` uses the same LoRA for all roll-out steps,
                 and `"all"` uses a different LoRA for every roll-out step. Defaults to `"single"`.
             use_lora (bool): Enable LoRA. By default, LoRA is disabled.
         """
@@ -762,8 +766,8 @@ class Swin3DTransformerBackbone(nn.Module):
         mlp_ratio: float = 4.0,
         qkv_bias: bool = True,
         drop_rate: float = 0.0,
-        attn_drop_rate: float = 0.0,
-        drop_path_rate: float = 0.0,
+        attn_drop_rate: float = 0.1,
+        drop_path_rate: float = 0.1,
         lora_steps: int = 40,
         lora_mode: LoRAMode = "single",
         use_lora: bool = False,
@@ -785,13 +789,12 @@ class Swin3DTransformerBackbone(nn.Module):
             qkv_bias (bool): If `True`, add a learnable bias to the query, key, and value. Defaults
                 to `True`.
             drop_rate (float): Drop-out rate. Defaults to `0.0`.
-            attn_drop_rate (float): Attention drop-out rate. Defaults to `0.0`.
-            drop_path_rate (float): Stochastic depth rate. Defaults to `0.0`.
+            attn_drop_rate (float): Attention drop-out rate. Defaults to `0.1`.
+            drop_path_rate (float): Stochastic depth rate. Defaults to `0.1`.
             lora_steps (int, optional): Maximum number of LoRA roll-out steps. Defaults to `40`.
-            lora_mode (str, optional): LoRA mode. `"single"` uses the same LoRA for all roll-out
-                steps, `"from_second"` uses the same LoRA from the second roll-out step on,
+            lora_mode (str, optional): Mode. `"single"` uses the same LoRA for all roll-out steps,
                 and `"all"` uses a different LoRA for every roll-out step. Defaults to `"single"`.
-            use_lora (bool, optional): Enable LoRA. By default, LoRA is disabled.
+            use_lora (bool): Enable LoRA. By default, LoRA is disabled.
         """
         super().__init__()
 

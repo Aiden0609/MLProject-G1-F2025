@@ -7,7 +7,13 @@ Parts of this code are inspired by
 
 import torch
 import torch.nn.functional as F
-from timm.layers import to_2tuple
+import timm
+def versiontuple(v):
+    return tuple(map(int, (v.split("."))))
+if versiontuple(timm.__version__) > versiontuple("0.6.13"):
+    from timm.layers.helpers import to_2tuple
+else:
+    from timm.models.layers.helpers import to_2tuple
 
 from aurora.model.fourier import FourierExpansion
 

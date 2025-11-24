@@ -1,30 +1,16 @@
-"""Copyright (c) Microsoft Corporation. Licensed under the MIT license."""
-
 from aurora.batch import Batch, Metadata
-from aurora.model.aurora import (
-    Aurora,
-    Aurora12hPretrained,
-    AuroraAirPollution,
-    AuroraHighRes,
-    AuroraPretrained,
-    AuroraSmall,
-    AuroraSmallPretrained,
-    AuroraWave,
+from aurora.model.aurora_lite import (
+    AuroraLite,
+)
+from aurora.model.decoder_lite import (
+    MLPDecoderLite,
 )
 from aurora.rollout import rollout
-from aurora.tracker import Tracker
 
 __all__ = [
-    "Aurora",
-    "AuroraPretrained",
-    "AuroraSmallPretrained",
-    "AuroraSmall",
-    "Aurora12hPretrained",
-    "AuroraHighRes",
-    "AuroraAirPollution",
-    "AuroraWave",
+    "AuroraLite",
+    "MLPDecoderLite",
     "Batch",
     "Metadata",
     "rollout",
-    "Tracker",
 ]
