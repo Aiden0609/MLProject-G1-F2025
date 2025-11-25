@@ -1,7 +1,6 @@
 from pathlib import Path
 import os
 import cdsapi
-import subprocess
 import time
 import random
 import xarray as xr
@@ -77,16 +76,16 @@ surface_vars = [
     "2m_temperature",
     "10m_u_component_of_wind",
     "10m_v_component_of_wind",
-    "mean_sea_level_pressure"
+    "mean_sea_level_pressure",
+    "sea_surface_temperature",
     ]
 
 for year in years:
     print(f"\n=== surface {year} ===")
 
-    monthly_files = []
+    
     for m in months:
         out_file = download_path / f"era5_surface_{year}_{m}.nc"
-        monthly_files.append(out_file)
 
         if out_file.exists():
             print(f"  exists: {out_file.name}")
@@ -110,14 +109,6 @@ for year in years:
 
         print_dimensions(out_file)
 
-    merged = download_path / f"era5_surface_{year}.nc"
-    print(f"  merging → {merged.name}")
-
-    subprocess.run(
-        ["ncrcat"] + [str(f) for f in monthly_files if f.exists()] + [str(merged)],
-        check=True,
-    )
-    print_dimensions(merged)
 
 # atmospheric variables
 atmospheric_vars = [
@@ -137,10 +128,10 @@ pressure_levels = [
 for year in years:
     print(f"\n=== pressure {year} ===")
 
-    monthly_files = []
+    
     for m in months:
         out_file = download_path / f"era5_atmospheric_{year}_{m}.nc"
-        monthly_files.append(out_file)
+        
 
         if out_file.exists():
             print(f"  exists: {out_file.name}")
@@ -168,25 +159,16 @@ for year in years:
 
     
 
-    merged = download_path / f"era5_atmospheric_{year}.nc"
-    print(f"  merging → {merged.name}")
-
-    subprocess.run(
-        ["ncrcat"] + [str(f) for f in monthly_files if f.exists()] + [str(merged)],
-        check=True,
-    )
-    print_dimensions(merged)
-
 
 # Instanteneous sensible heat flux 
 
 for year in years:
     print(f"\n=== flux {year} ===")
 
-    monthly_files = []
+    
     for m in months:
         out_file = download_path / f"era5_flux_{year}_{m}.nc"
-        monthly_files.append(out_file)
+        
 
         if out_file.exists():
             print(f"  exists: {out_file.name}")
@@ -209,16 +191,5 @@ for year in years:
         )
 
         print_dimensions(out_file)
-
-    merged = download_path / f"era5_flux_{year}.nc"
-    print(f"  merging → {merged.name}")
-
-    subprocess.run(
-        ["ncrcat"] + [str(f) for f in monthly_files if f.exists()] + [str(merged)],
-        check=True,
-    )
-    print_dimensions(merged)
-
-
 
 print("\nall done")
