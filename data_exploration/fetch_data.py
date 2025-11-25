@@ -92,11 +92,11 @@ flux_variables = [
 ]
 invariant_variables = ["land_sea_mask"]
 variables = {
-    # "instant": instant_variables,
+    "instant": instant_variables,
     # "wave_instant": wave_instant_variables,
     # "accumulated": accumulated_variables,
     # "hydrological": hydrological_variables,
-    # "flux": flux_variables
+    "flux": flux_variables,
     "invariant": invariant_variables,
 }
 
