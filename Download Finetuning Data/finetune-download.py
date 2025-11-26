@@ -124,6 +124,7 @@ for year in years:
             continue
 
         print(f"  downloading {out_file.name}")
+        start = time.time()
         ok = robust_retrieve(
             "reanalysis-era5-single-levels",
             {
@@ -137,6 +138,9 @@ for year in years:
             },
             out_file,
         )
+        end = time.time()
+        if (end - start) // 60 > 10:
+            c = cdsapi.Client()
 
         print_dimensions(out_file)
 
@@ -178,6 +182,7 @@ for year in years:
             continue
 
         print(f"  downloading {out_file.name}")
+        start = time.time()
         ok = robust_retrieve(
             "reanalysis-era5-pressure-levels",
             {
@@ -192,5 +197,8 @@ for year in years:
             },
             out_file,
         )
+        end = time.time()
+        if (end - start) // 60 > 10:
+            c = cdsapi.Client()
 
         print_dimensions(out_file)
