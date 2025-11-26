@@ -86,7 +86,7 @@ def main():
                 latent_decoder = latent.detach().clone()
 
             opt.zero_grad()
-            preds_new = modelDecoder(
+            preds_new: dict[str, torch.Tensor] = modelDecoder(
                 latent_decoder, batch.metadata.lat, batch.metadata.lon
             )
             pred_flux = preds_new["ishf"].squeeze(1)  # (B, H, W)

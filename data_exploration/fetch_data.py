@@ -45,16 +45,17 @@ instant_variables = [
     "2m_temperature",
     "10m_u_component_of_wind",
     "10m_v_component_of_wind",
-    "instantaneous_surface_sensible_heat_flux",
-    "instantaneous_10m_wind_gust",
-    "soil_temperature_level_1",
-    "temperature_of_snow_layer",
+    # "instantaneous_surface_sensible_heat_flux",
+    # "instantaneous_10m_wind_gust",
+    # "soil_temperature_level_1",
+    # "temperature_of_snow_layer",
     # "2m_dewpoint_temperature",
     # "mean_sea_level_pressure",
     # "surface_pressure",
-    "ice_temperature_layer_1",
+    # "ice_temperature_layer_1",
     "sea_ice_cover",
-    "skin_temperature",
+    "mean_sea_level_pressure",
+    # "skin_temperature",
 ]
 
 wave_instant_variables = [
@@ -90,24 +91,53 @@ flux_variables = [
     "mean_surface_net_short_wave_radiation_flux_clear_sky",
     "mean_surface_sensible_heat_flux",
 ]
-invariant_variables = ["land_sea_mask"]
+static_variables = [
+    "geopotential",
+    "land_sea_mask",
+    "soil_type",
+]
+atmos_variables = [
+    "temperature",
+    "u_component_of_wind",
+    "v_component_of_wind",
+    "specific_humidity",
+    "geopotential",
+]
+pressure_levels = [
+    "50",
+    "100",
+    "150",
+    "200",
+    "250",
+    "300",
+    "400",
+    "500",
+    "600",
+    "700",
+    "850",
+    "925",
+    "1000",
+]
 variables = {
-    "instant": instant_variables,
+    "surface-level": instant_variables,
+    "static": static_variables,
+    "atmospheric": atmos_variables,
     # "wave_instant": wave_instant_variables,
     # "accumulated": accumulated_variables,
     # "hydrological": hydrological_variables,
-    "flux": flux_variables,
-    "invariant": invariant_variables,
+    # "flux": flux_variables,
+    # "invariant": invariant_variables,
 }
 
 
 for name, variable in variables.items():
-    name = name + "_full_year"
+    # name = name + "_full_year"
     request = {
         "product_type": ["reanalysis"],
         "variable": variable,
         "year": ["2023"],
-        "month": ["01", "04", "07", "11"],
+        # "month": ["01", "04", "07", "11"],
+        "month": ["01"],
         # "day": ["01", "02", "03"],
         "day": ["01", "08", "15", "24"],
         # "time": ["00:00", "06:00", "12:00", "18:00"],
@@ -117,6 +147,8 @@ for name, variable in variables.items():
         # "area": [66, -60, 48, -24],
         "area": [90, -180, -90, 180],
     }
+    if name.startswith("atmospheric"):
+        request["pressure_level"] = pressure_levels
 
     target = f"{dataset}/{name}.nc"  # Output file. Adapt as you wish.
 

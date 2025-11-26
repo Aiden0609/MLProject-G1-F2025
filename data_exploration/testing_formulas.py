@@ -52,14 +52,14 @@ def prepare_data(
         # longitude=slice(-60, -24),
         # latitude=slice(66, 48),
         # valid_time=slice("2023-01-01T06", "2023-01-03T18"),
-        valid_time="2023-01-01T06",
+        # valid_time="2023-01-01T06",
         # valid_time="2023-01-01T18",
         # valid_time="2023-01",
         # valid_time=slice("2023-07", "2023-08"),
     )
-    # era5_instant = era5_instant.mean("valid_time")
-    # era5_wave_instant = era5_wave_instant.mean("valid_time")
-    # era5_accum = era5_accum.mean("valid_time")
+    era5_instant = era5_instant.mean("valid_time")
+    era5_wave_instant = era5_wave_instant.mean("valid_time")
+    era5_accum = era5_accum.mean("valid_time")
     return era5_instant, era5_accum, era5_wave_instant
 
 
@@ -76,11 +76,11 @@ def sensible_heat(
 
 
 with xr.open_dataset(
-    filepath_instant, engine="netcdf4"
+    filepath_instant, engine="netcdf4", chunks="auto"
 ) as era5_instant, xr.open_dataset(
-    filepath_accum, engine="netcdf4"
+    filepath_accum, engine="netcdf4", chunks="auto"
 ) as era5_accum, xr.open_dataset(
-    filepath_wave_instant, engine="netcdf4"
+    filepath_wave_instant, engine="netcdf4", chunks="auto"
 ) as era5_wave_instant:
     era5_instant, era5_accum, era5_wave_instant = prepare_data(
         era5_instant, era5_accum, era5_wave_instant
@@ -108,6 +108,8 @@ with xr.open_dataset(
     skt = torch.from_numpy(era5_instant.variables["skt"].values) - 273
 
     sst = torch.where(ci > 0.5, torch.nan, sst)
+    print(torch.nanmean(ci))
+    print(np.nanstd(ci.numpy()))
     # sst = ci * istl1 + (1 - ci) * sst
 
     # sst = (sst + skt) / 2
