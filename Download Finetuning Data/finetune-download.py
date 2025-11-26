@@ -12,16 +12,43 @@ download_path.mkdir(parents=True, exist_ok=True)
 
 c = cdsapi.Client()
 
-years = ["2020","2021","2022","2023","2024"]
-months = ["01","02","03","04","05","06","07","08","09","10","11","12"]
+years = ["2020", "2021", "2022", "2023", "2024"]
+months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 days = [
-    "01","02","03","04","05","06","07",
-    "08","09","10","11","12","13","14",
-    "15","16","17","18","19","20","21",
-    "22","23","24","25","26","27","28",
-    "29","30","31"
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08",
+    "09",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+    "24",
+    "25",
+    "26",
+    "27",
+    "28",
+    "29",
+    "30",
+    "31",
 ]
-times = ["00:00","06:00","12:00","18:00"]
+times = ["00:00", "06:00", "12:00", "18:00"]
+
 
 # retry logic
 def robust_retrieve(dataset, request_dict, outfile, max_retries=8):
@@ -41,6 +68,7 @@ def robust_retrieve(dataset, request_dict, outfile, max_retries=8):
             time.sleep(sleep_time)
     return False
 
+
 # check if a file is readable
 def print_dimensions(path):
     try:
@@ -50,6 +78,7 @@ def print_dimensions(path):
     except Exception as e:
         print(f"    CORRUPT: cannot open ({e})")
 
+
 # static data
 static_file = download_path / "static.nc"
 if not static_file.exists():
@@ -58,7 +87,7 @@ if not static_file.exists():
         "reanalysis-era5-single-levels",
         {
             "product_type": "reanalysis",
-            "variable": ["geopotential","land_sea_mask","soil_type"],
+            "variable": ["geopotential", "land_sea_mask", "soil_type"],
             "year": "2020",
             "month": "01",
             "day": "01",
@@ -73,17 +102,17 @@ else:
 
 # surface variables
 surface_vars = [
+    "sea_surface_temperature",
     "2m_temperature",
     "10m_u_component_of_wind",
     "10m_v_component_of_wind",
+    "sea_ice_cover",
     "mean_sea_level_pressure",
-    "sea_surface_temperature",
-    ]
+]
 
 for year in years:
     print(f"\n=== surface {year} ===")
 
-    
     for m in months:
         out_file = download_path / f"era5_surface_{year}_{m}.nc"
 
@@ -120,18 +149,26 @@ atmospheric_vars = [
 ]
 
 pressure_levels = [
-    "50","100","150","200","250",
-    "300","400","500","600","700",
-    "850","925","1000"
+    "50",
+    "100",
+    "150",
+    "200",
+    "250",
+    "300",
+    "400",
+    "500",
+    "600",
+    "700",
+    "850",
+    "925",
+    "1000",
 ]
 
 for year in years:
     print(f"\n=== pressure {year} ===")
 
-    
     for m in months:
         out_file = download_path / f"era5_atmospheric_{year}_{m}.nc"
-        
 
         if out_file.exists():
             print(f"  exists: {out_file.name}")
@@ -157,18 +194,13 @@ for year in years:
         print_dimensions(out_file)
 
 
-    
-
-
-# Instanteneous sensible heat flux 
+# Instanteneous sensible heat flux
 
 for year in years:
     print(f"\n=== flux {year} ===")
 
-    
     for m in months:
         out_file = download_path / f"era5_flux_{year}_{m}.nc"
-        
 
         if out_file.exists():
             print(f"  exists: {out_file.name}")
