@@ -27,6 +27,6 @@ source ~/envs/py311/bin/activate
 #pip freeze > requirements.txt
 
 # Run the python script
-python ~/projects/Download\ Finetuning\ Data/finetune-download.py
+python ~/projects/def-lev/bmhod/Download\ Finetuning\ Data/finetune-download.py
 
 echo "Job finished on $(date)"
