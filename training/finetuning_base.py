@@ -138,7 +138,9 @@ if not torch.cuda.is_available():
     raise RuntimeError("Need CUDA for Aurora fine-tuning.")
 device = torch.device("cuda")
 data_path = Path("./data/downloads")
-dataset = SSTDataset(data_path, ["sst"])
+dataset = SSTDataset(
+    data_path, ["sst"], surface_variables=["t2m", "u10", "v10", "msl", "sst", "siconc"]
+)
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True)
 
@@ -146,8 +148,10 @@ model.load_checkpoint("microsoft/aurora", "aurora-0.25-pretrained.ckpt")
 model.configure_activation_checkpointing()
 model.train()
 model = model.to(device)
+over_size = 1 / (720 * 1440)
 
 opt = torch.optim.AdamW(model.parameters(), lr=3e-4)
+scaler = torch.amp.GradScaler()
 writer = SummaryWriter(log_dir="runs/sst_finetune")
 
 global_step = 0
@@ -157,22 +161,23 @@ for epoch in range(4):
         target_batch: Batch
         opt.zero_grad()
         prediction: Batch = model(input_batch.to("cuda"))
-        loss_value: torch.Tensor = loss(prediction, target_batch, 0)
-        loss_value.backward()
-        opt.step()
+        loss_value: torch.Tensor = loss(prediction, target_batch, over_size)
+        scaler.scale(loss_value).backward()
+        scaler.step(opt)
+        scaler.update()
 
         writer.add_scalar("train/loss_step", loss_value.item(), global_step)
 
         if batch_idx == 0:
             # Log the first sample prediction/target as images for a quick qualitative check.
             writer.add_image(
-                "train/pred_sst",
+                f"train/pred_sst_{epoch}",
                 prediction.surf_vars["sst"][-1],
                 global_step,
                 dataformats="CHW",
             )
             writer.add_image(
-                "train/target_sst",
+                f"train/target_sst_{epoch}",
                 target_batch.surf_vars["sst"][-1],
                 global_step,
                 dataformats="CHW",
