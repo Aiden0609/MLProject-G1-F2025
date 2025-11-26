@@ -14,6 +14,7 @@ from aurora.normalisation import (
 )
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+from data import SSTDataset
 
 MAE = nn.L1Loss()
 
@@ -53,22 +54,36 @@ def sensible_heat(
 def loss(
     pred: Batch,
     target: Batch,
-    ice_cover: torch.Tensor,
     over_size: int,
-    alpha: float = 0.25,
-    beta: float = 1.0,
+    ice_threshold: float = 0.3,
+    physics_loss_hyperparameter=0.03,
 ) -> torch.Tensor:
+    """
+    Docstring for loss
+
+    :param pred: Batch containing the predicted values
+    :type pred: Batch
+    :param target: Batch containing the target information. Please note that this also contains all the information required to predict for the next iteration, meaning the data for the last `valid_time` should be used
+    :type target: Batch
+    :param over_size: 1/(H x W), precomputed for efficiency (very little impact)
+    :type over_size: int
+    :return: The loss
+    :rtype: Tensor
+    """
+    # TODO check if only last value of target is needed?
+    # According to https://microsoft.github.io/aurora/batch.html#model-output, yes
     surf_values = pred.surf_vars.values()
-    pred_sst = surf_values["sst"]
-    pred_t2m = surf_values["t2m"]
-    pred_u10 = surf_values["u10"]
-    pred_v10 = surf_values["v10"]
+    pred_sst = surf_values["sst"][-1]
+    pred_t2m = surf_values["t2m"][-1]
+    pred_u10 = surf_values["u10"][-1]
+    pred_v10 = surf_values["v10"][-1]
     pred_wind_speed = torch.sqrt(pred_u10**2, pred_v10**2)
 
-    target_sst = target["sst"]
-    target_t2m = target["t2m"]
-    target_u10 = target["u10"]
-    target_v10 = target["v10"]
+    # only the last value in target
+    target_sst = target["sst"][-1]
+    target_t2m = target["t2m"][-1]
+    target_u10 = target["u10"][-1]
+    target_v10 = target["v10"][-1]
     target_wind_speed = torch.sqrt(target_u10**2, target_v10**2)
 
     pred_sh = sensible_heat(pred_sst, pred_t2m, pred_wind_speed)
@@ -78,20 +93,54 @@ def loss(
     norm_target_sst = normalise_surf_var(target_sst, "sst", model.surf_stats)
     phys_loss_pre = abs(norm_pred_sst - norm_target_sst) * abs(pred_sh - target_sh)
     # TODO is this the correct interpretation
-    phys_loss_pre = torch.where(ice_cover > 0.3, torch.nan, phys_loss_pre)
+    ice_cover = target["siconc"][-1]
+    # Removes latent heat for ocean covered by more than `ice_threshold` ice
+    phys_loss_pre = torch.where(ice_cover > ice_threshold, torch.nan, phys_loss_pre)
+
     phys_loss = torch.nansum(phys_loss_pre) * over_size
 
     mae_loss = nn.functional.mse_loss(norm_pred_sst, target_sst)
 
-    return mae_loss + phys_loss
+    return mae_loss + physics_loss_hyperparameter * phys_loss
+
+
+# def collate_batches(batch_items) -> tuple[Batch, Batch]:
+#     batch
+#     for batches in batch_items:
+#         surf_vars = {
+#             k: torch.cat([b.surf_vars[k] for b in batches], dim=0)
+#             for k in batches[0].surf_vars
+#         }
+#         atmos_vars = {
+#             k: torch.cat([b.atmos_vars[k] for b in batches], dim=0)
+#             for k in batches[0].atmos_vars
+#         }
+
+#         static_vars = batches[0].static_vars  # Same for every sample.
+
+#         metadata = batches[0].metadata
+#         metadata = type(metadata)(
+#             lat=metadata.lat,
+#             lon=metadata.lon,
+#             time=tuple(b.metadata.time[0] for b in batches),
+#             atmos_levels=metadata.atmos_levels,
+#         )
+
+#         stacked_batch = type(batches[0])(
+#             surf_vars=surf_vars,
+#             static_vars=static_vars,
+#             atmos_vars=atmos_vars,
+#             metadata=metadata,
+#         )
 
 
 if not torch.cuda.is_available():
     raise RuntimeError("Need CUDA for Aurora fine-tuning.")
 device = torch.device("cuda")
 data_path = Path("./data/downloads")
-
-dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
+dataset = SSTDataset(data_path, ["sst"])
+# dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True)
 
 model.load_checkpoint("microsoft/aurora", "aurora-0.25-pretrained.ckpt")
 model.configure_activation_checkpointing()
@@ -102,11 +151,13 @@ opt = torch.optim.AdamW(model.parameters(), lr=3e-4)
 writer = SummaryWriter(log_dir="runs/sst_finetune")
 
 global_step = 0
-for epoch in range(2):
-    for batch_idx, (batch, target) in enumerate(dataloader):
+for epoch in range(4):
+    for batch_idx, (input_batch, target_batch) in enumerate(dataloader):
+        input_batch: Batch
+        target_batch: Batch
         opt.zero_grad()
-        prediction = model(batch.to("cuda"))
-        loss_value: torch.Tensor = loss(prediction, target, 0)
+        prediction: Batch = model(input_batch.to("cuda"))
+        loss_value: torch.Tensor = loss(prediction, target_batch, 0)
         loss_value.backward()
         opt.step()
 
@@ -115,14 +166,14 @@ for epoch in range(2):
         if batch_idx == 0:
             # Log the first sample prediction/target as images for a quick qualitative check.
             writer.add_image(
-                "train/pred_ishf",
-                prediction[0].unsqueeze(0),
+                "train/pred_sst",
+                prediction.surf_vars["sst"][-1],
                 global_step,
                 dataformats="CHW",
             )
             writer.add_image(
-                "train/target_ishf",
-                target[0].unsqueeze(0),
+                "train/target_sst",
+                target_batch.surf_vars["sst"][-1],
                 global_step,
                 dataformats="CHW",
             )
@@ -130,4 +181,7 @@ for epoch in range(2):
     writer.add_scalar("train/loss_epoch", loss_value.item(), epoch)
     writer.flush()
     torch.save(model.state_dict(), f"sst_finetuned_{epoch}.ckpt")
+    if epoch == 2:
+        model.use_lora(True)
+
 writer.close()

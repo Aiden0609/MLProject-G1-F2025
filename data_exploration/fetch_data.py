@@ -36,9 +36,11 @@ client = cdsapi.Client()
 #     "download_format": "unarchived",
 #     "area": [90, -180, -90, 180],
 # }
-dataset = "reanalysis-era5-single-levels"
-if not os.path.exists(dataset):
-    os.mkdir(dataset)
+dataset_single_levels = "reanalysis-era5-single-levels"
+dataset_pressure_levels = "reanalysis-era5-pressure-levels"
+datapath = "data"
+if not os.path.exists(datapath):
+    os.mkdir(datapath)
 
 instant_variables = [
     "sea_surface_temperature",
@@ -145,17 +147,24 @@ for name, variable in variables.items():
         "data_format": "netcdf",
         "download_format": "unarchived",
         # "area": [66, -60, 48, -24],
-        "area": [90, -180, -90, 180],
+        # "area": [90, -180, -90, 180],
     }
     if name.startswith("atmospheric"):
         request["pressure_level"] = pressure_levels
+        dataset = dataset_pressure_levels
+    else:
+        dataset = dataset_single_levels
 
-    target = f"{dataset}/{name}.nc"  # Output file. Adapt as you wish.
+    target = f"{datapath}/{name}.nc"  # Output file. Adapt as you wish.
 
     client.retrieve(dataset, request).download(target)
+    # Source - https://stackoverflow.com/a
+    # Posted by ClimateUnboxed, modified by community. See post 'Timeline' for change history
+    # Retrieved 2025-11-26, License - CC BY-SA 4.0
+    # os.system(f"cdo sellonlatbox,0,360,-90,90 {target} {datapath}/{name}_remapped.nc")
     if name.startswith("wave_instant"):
 
         # cwd = os.getcwd()
         os.system(
-            f"cdo remapbil,{dataset}/instant.nc {target} {dataset}/bil_remapped_{name}.nc"
+            f"cdo remapbil,{datapath}/instant.nc {target} {datapath}/bil_remapped_{name}.nc"
         )

@@ -9,28 +9,56 @@ import xarray as xr
 
 class SSTDataset(Dataset):
     def __init__(
-        self, path: Path, history: int = 2, chunks: Literal["auto"] | None = "auto"
+        self,
+        path: Path,
+        targets: list[str],
+        history: int = 2,
+        static_variables: list[str] = None,
+        surface_variables: list[str] = None,
+        atmosphere_variables: list[str] = None,
+        chunks: Literal["auto"] | None = "auto",
     ) -> None:
         super().__init__()
+        if static_variables is None:
+            static_variables = ["z", "slt", "lsm"]
+        if surface_variables is None:
+            surface_variables = ["t2m", "u10", "v10", "msl"]
+        if atmosphere_variables is None:
+            atmosphere_variables = ["z", "u", "v", "t", "q"]
+
+        for target in targets:
+            if target not in surface_variables and target not in atmosphere_variables:
+                raise ValueError(
+                    "Target must be included in surface or atmosphere variables"
+                )
+
         self.path = path
+        self.targets = targets
         self.history = history
+
+        # ----- Static ----
         self.static_ds = xr.open_dataset(
             self.path / "static.nc", engine="netcdf4", chunks=chunks
         )
         self.static_ds = self.static_ds.sel(latitude=self.static_ds["latitude"][:720])
+        self.static_variables = static_variables
         self.static_vars = {
-            "z": torch.from_numpy(self.static_ds["z"].values[0]),
-            "slt": torch.from_numpy(self.static_ds["slt"].values[0]),
-            "lsm": torch.from_numpy(self.static_ds["lsm"].values[0]),
+            var_name: torch.from_numpy(self.static_ds[var_name].values[0])
+            for var_name in static_variables
         }
 
+        # ----- Surface ----
         self.surf_ds = xr.open_dataset(
             self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
         )
         self.surf_ds = self.surf_ds.sel(latitude=self.surf_ds["latitude"][:720])
-        self.lat = (torch.from_numpy(self.surf_ds["latitude"].values),)
-        self.lon = (torch.from_numpy(self.surf_ds["longitude"].values),)
+        self.surf_variables = surface_variables
 
+        self.lat = torch.from_numpy(self.surf_ds["latitude"].values)
+        self.lon = torch.from_numpy(self.surf_ds["longitude"].values)
+
+        # ----- Atmosphere ----
+        # TODO not use remapped
         self.atmos_ds = xr.open_dataset(
             self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
         )
@@ -38,7 +66,9 @@ class SSTDataset(Dataset):
         self.atmos_levels = tuple(
             int(level) for level in self.atmos_ds["pressure_level"].values
         )
+        self.atmos_variables = atmosphere_variables
 
+        # ----- Other ----
         # Converting to `datetime64[s]` ensures that the output of `tolist()` gives
         # `datetime.datetime`s. Note that this needs to be a tuple of length one:
         # one value for every batch element. Select element 1, corresponding to time
@@ -55,6 +85,15 @@ class SSTDataset(Dataset):
         return len(self.times)
 
     def __getitem__(self, index: int):
+        """
+        :param index: Must be
+        :type index: int
+        """
+        if index != -1 and index != self.last_index + 1:
+            raise ValueError("Must access data in order")
+        else:
+            self.last_index = index
+
         index += 1
         self.cur = self.next
         start = self.times[index]
@@ -67,13 +106,19 @@ class SSTDataset(Dataset):
         sliced_atmos = self.atmos_ds.sel(valid_time=time_slice)
 
         surf_vars = {
-            key: torch.from_numpy(val.values)
-            for key, val in sliced_surf.variables.items()
+            var_name: torch.from_numpy(sliced_surf[var_name].values)
+            for var_name in self.surf_variables
         }
         atmos_vars = {
-            key: torch.from_numpy(val.values)
-            for key, val in sliced_atmos.variables.items()
+            var_name: torch.from_numpy(sliced_atmos[var_name].values)
+            for var_name in self.atmos_variables
         }
+        # we only train based on target vars
+        for var_name, val in surf_vars.items():
+            val.requires_grad = var_name in self.targets
+        for var_name, val in atmos_vars.items():
+            val.requires_grad = var_name in self.targets
+
         # TODO does this need to be copied?
         metadata = Metadata(
             lat=self.lat,
@@ -92,4 +137,12 @@ class SSTDataset(Dataset):
 
 
 if __name__ == "__main__":
-    path = Path("../data_exploration/reanalysis-era5-single-levels")
+    path = Path("../data_exploration/data")
+    dataset = SSTDataset(
+        path,
+        ["sst"],
+        surface_variables=["t2m", "u10", "v10", "msl", "sst", "siconc"],
+        history=0,
+    )
+    input, target = dataset[0]
+    print(input.surf_vars["sst"][-1].shape)
