@@ -1,0 +1,17 @@
+--------------------------------------------------------------------------
+WARNING: Open MPI failed to open the /dev/knem device due to a local
+error. Please check with your system administrator to get the problem
+fixed, or set the smsc MCA variable to "^knem" to silence this warning
+and run without knem support.
+
+Open MPI will try to fall back on another single-copy mechanism if one
+is available.  This may result in lower performance.
+
+  Local host: fc10515
+  Errno:      2 (No such file or directory)
+--------------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/mridul01/projects/small-aurora/sst-infer/sst-infer-small.py", line 214, in <module>
+    .isel(valid_time=slice(2, 2 + len(preds)))   # match prediction steps
+     ^^^^
+AttributeError: 'numpy.ndarray' object has no attribute 'isel'

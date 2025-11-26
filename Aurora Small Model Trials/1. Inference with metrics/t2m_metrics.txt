@@ -1,0 +1,2 @@
+Weighted RMSE: 37.8168
+Weighted ACC: 0.9722

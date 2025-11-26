@@ -1,0 +1,21 @@
+/home/mridul01/envs/py311/lib/python3.11/site-packages/huggingface_hub/file_download.py:801: UserWarning: Not enough free disk space to download the file. The expected file size is: 5038.34 MB. The target location /home/mridul01/.cache/huggingface/hub/models--microsoft--aurora/blobs only has 4421.14 MB free disk space.
+  warnings.warn(
+Traceback (most recent call last):
+  File "/home/mridul01/projects/small-aurora/parameters_count/parameters_count.py", line 33, in <module>
+    model2.load_checkpoint()
+  File "/home/mridul01/envs/py311/lib/python3.11/site-packages/aurora/model/aurora.py", line 429, in load_checkpoint
+    path = hf_hub_download(repo_id=repo, filename=name, revision=revision)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mridul01/envs/py311/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/mridul01/envs/py311/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1010, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mridul01/envs/py311/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1171, in _hf_hub_download_to_cache_dir
+    _download_to_tmp_and_move(
+  File "/home/mridul01/envs/py311/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1723, in _download_to_tmp_and_move
+    xet_get(
+  File "/home/mridul01/envs/py311/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 629, in xet_get
+    download_files(
+RuntimeError: Data processing error: CAS service error : IO Error: Disk quota exceeded (os error 122)

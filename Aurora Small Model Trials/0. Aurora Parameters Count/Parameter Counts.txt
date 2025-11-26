@@ -1,0 +1,12 @@
+Total Parameters in Aurora Pretrained: 1256300176
+Trainable Parameters in Aurora Pretrained: 1256300176
+Total Parameters in Aurora Small Pretrained: 112797584
+Trainable Parameters in Aurora Small Pretrained: 112797584
+Total Parameters in Aurora Finetuned: 1259150992
+Trainable Parameters in Aurora Finetuned: 1259150992
+Total Parameters in Aurora 12h Pretrained: 1256300176
+Trainable Parameters in Aurora 12h Pretrained: 1256300176
+Total Parameters in Aurora HighRes 1 degree: 1201987972
+Trainable Parameters in Aurora HighRes 1 degree: 1201987972
+Total Parameters in Aurora Wave: 1260595520
+Trainable Parameters in Aurora Wave: 1260595520
