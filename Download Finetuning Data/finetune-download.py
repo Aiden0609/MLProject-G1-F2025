@@ -77,6 +77,8 @@ def print_dimensions(path):
         ds.close()
     except Exception as e:
         print(f"    CORRUPT: cannot open ({e})")
+        print("    Deliting file")
+        os.remove(path)
 
 
 # static data
@@ -192,36 +194,3 @@ for year in years:
         )
 
         print_dimensions(out_file)
-
-
-# Instanteneous sensible heat flux
-
-for year in years:
-    print(f"\n=== flux {year} ===")
-
-    for m in months:
-        out_file = download_path / f"era5_flux_{year}_{m}.nc"
-
-        if out_file.exists():
-            print(f"  exists: {out_file.name}")
-            print_dimensions(out_file)
-            continue
-
-        print(f"  downloading {out_file.name}")
-        ok = robust_retrieve(
-            "reanalysis-era5-single-levels",
-            {
-                "product_type": "reanalysis",
-                "variable": ["instantaneous_surface_sensible_heat_flux"],
-                "year": year,
-                "month": m,
-                "day": days,
-                "time": times,
-                "format": "netcdf",
-            },
-            out_file,
-        )
-
-        print_dimensions(out_file)
-
-print("\nall done")
