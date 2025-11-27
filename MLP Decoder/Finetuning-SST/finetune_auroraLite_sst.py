@@ -14,8 +14,6 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch.nn.utils import clip_grad_norm_
 
-
-
 from aurora.batch import Batch, Metadata
 from aurora.model.aurora_lite import AuroraLite
 from aurora.model.decoder_lite import MLPDecoderLite
@@ -27,7 +25,7 @@ data_path = data_path.expanduser()
 
 
 # create dataset and dataloader
-class AuroraFluxDataset(Dataset):
+class AuroraSSTDataset(Dataset):
     def __init__(self, data_path, history=2, years=None, cache_dir=None):
         self.data_path = Path(data_path)
         self.history = history
@@ -35,7 +33,7 @@ class AuroraFluxDataset(Dataset):
         
         # Setup cache directory in scratch
         if cache_dir is None:
-            self.cache_dir = Path(f"/scratch/{os.environ['USER']}/cache/aurora_flux")
+            self.cache_dir = Path(f"/scratch/{os.environ['USER']}/cache/aurora_sst")
         else:
             self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -49,19 +47,16 @@ class AuroraFluxDataset(Dataset):
         # Build file lists based on actual naming pattern
         self.surf_files = []
         self.atmos_files = []
-        self.flux_files = []
         
         for year in self.years:
             for month in range(1, 13):
                 m = f"{month:02d}"
                 surf_file = self.data_path / f"era5_surface_{year}_{m}.nc"
                 atmos_file = self.data_path / f"era5_atmospheric_{year}_{m}.nc"
-                flux_file = self.data_path / f"era5_flux_{year}_{m}.nc"
                 
-                if surf_file.exists() and atmos_file.exists() and flux_file.exists():
+                if surf_file.exists() and atmos_file.exists():
                     self.surf_files.append(surf_file)
                     self.atmos_files.append(atmos_file)
-                    self.flux_files.append(flux_file)
                 else:
                     print(f"Warning: Missing files for {year}-{m}")
 
@@ -88,7 +83,6 @@ class AuroraFluxDataset(Dataset):
         print("Opening datasets...")
         self.surf_datasets = [xr.open_dataset(f).isel(latitude=slice(0, 720)) for f in self.surf_files]
         self.atmos_datasets = [xr.open_dataset(f).isel(latitude=slice(0, 720)) for f in self.atmos_files]
-        self.flux_datasets = [xr.open_dataset(f).isel(latitude=slice(0, 720)) for f in self.flux_files]
         print("Datasets opened and ready!")
 
     def _build_index_map(self):
@@ -114,7 +108,6 @@ class AuroraFluxDataset(Dataset):
         # Access already-open datasets (no file I/O overhead!)
         surf = self.surf_datasets[m_idx]
         atmos = self.atmos_datasets[m_idx]
-        flux = self.flux_datasets[m_idx]
 
         # Determine time dimension name
         time_dim = 'valid_time'
@@ -123,10 +116,13 @@ class AuroraFluxDataset(Dataset):
         surf_hist = surf.isel({time_dim: slice(t-self.history, t)})
         atmos_hist = atmos.isel({time_dim: slice(t-self.history, t)})
 
-        # Target at time t
+        # Target at time t - SST from surface variables
         target = torch.from_numpy(
-            flux["ishf"].isel({time_dim: t}).values
+            surf["sst"].isel({time_dim: t}).values
         ).float()
+        
+        # Create ocean mask (True where SST is valid, i.e., ocean pixels)
+        ocean_mask = ~torch.isnan(target)
 
         # Convert inputs to tensors
         batch = Batch(
@@ -156,35 +152,42 @@ class AuroraFluxDataset(Dataset):
             )
         )
 
-        return batch, target
+        return batch, target, ocean_mask
 
     def __del__(self):
         """Clean up file handles"""
         if hasattr(self, 'surf_datasets'):
-            for ds in self.surf_datasets + self.atmos_datasets + self.flux_datasets:
+            for ds in self.surf_datasets + self.atmos_datasets:
                 try:
                     ds.close()
                 except:
                     pass
-    
+
+
+# Masked loss function for SST
+def masked_loss(pred, target, mask, loss_fn=F.l1_loss):
+    """Compute loss only on valid ocean pixels"""
+    valid_pred = pred[mask]
+    valid_target = target[mask]
+    return loss_fn(valid_pred, valid_target)
 
 
 # Setup
 device = torch.device("cuda")
 
 # Create datasets (Strategy 1 - temporal split)
-train_dataset = AuroraFluxDataset(
+train_dataset = AuroraSSTDataset(
     data_path=data_path,
     history=2,
     years=[2020, 2021],
-    cache_dir=f"/scratch/{os.environ['USER']}/cache/aurora_flux_train"
+    cache_dir=f"/scratch/{os.environ['USER']}/cache/aurora_sst_train"
 )
 
-val_dataset = AuroraFluxDataset(
+val_dataset = AuroraSSTDataset(
     data_path=data_path,
     history=2,
     years=[2022],
-    cache_dir=f"/scratch/{os.environ['USER']}/cache/aurora_flux_val"
+    cache_dir=f"/scratch/{os.environ['USER']}/cache/aurora_sst_val"
 )
 
 train_loader = DataLoader(
@@ -193,7 +196,7 @@ train_loader = DataLoader(
     shuffle=True, 
     num_workers=4, 
     pin_memory=True,
-    drop_last=True  # ← Add this
+    drop_last=True
 )
 val_loader = DataLoader(
     val_dataset, 
@@ -201,7 +204,7 @@ val_loader = DataLoader(
     shuffle=False, 
     num_workers=4, 
     pin_memory=True,
-    drop_last=True  # ← Add this
+    drop_last=True
 )
 
 # Models
@@ -217,7 +220,7 @@ modelAurora = modelAurora.to(device)
 modelAurora.eval()
 
 modelDecoder = MLPDecoderLite(
-    surf_vars_new=["ishf"],
+    surf_vars_new=["sst"],
     patch_size=modelAurora.decoder.patch_size,
     embed_dim=2 * modelAurora.encoder.embed_dim,
     hidden_dims=[512, 512, 256],
@@ -230,22 +233,23 @@ modelDecoder = modelDecoder.to(device)
 opt = torch.optim.AdamW(modelDecoder.parameters(), lr=3e-4)
 
 # TensorBoard
-writer = SummaryWriter(log_dir="runs/ishf_finetune")
+writer = SummaryWriter(log_dir="runs/sst_finetune")
 global_step = 0
 
 # Best model tracking
 best_val_loss = float('inf')
-ckpt_dir = Path(f"/scratch/{os.environ['USER']}/checkpoints/ishf_finetune")
+ckpt_dir = Path(f"/scratch/{os.environ['USER']}/checkpoints/sst_finetune")
 ckpt_dir.mkdir(parents=True, exist_ok=True)
 
 
 print("Testing DataLoader...")
-for i, (batch, target) in enumerate(train_loader):
+for i, (batch, target, ocean_mask) in enumerate(train_loader):
     print(f"surf_vars['2t']: {batch.surf_vars['2t'].shape}")
     print(f"atmos_vars['t']: {batch.atmos_vars['t'].shape}")
     print(f"static_vars['z']: {batch.static_vars['z'].shape}")
     print(f"target: {target.shape}")
-    break  # Just test first batch
+    print(f"ocean_mask: {ocean_mask.shape}, ocean pixels: {ocean_mask.sum().item()}")
+    break
 
 # Training loop
 for epoch in range(10):
@@ -260,9 +264,10 @@ for epoch in range(10):
     # Calculate halfway point
     half_epoch = len(train_loader) // 2
     
-    for batch_idx, (batch, target) in enumerate(train_loader):
+    for batch_idx, (batch, target, ocean_mask) in enumerate(train_loader):
         batch = batch.to(device)
         target = target.to(device)
+        ocean_mask = ocean_mask.to(device)
         
         # Forward Aurora encoder (frozen)
         with torch.inference_mode():
@@ -272,16 +277,15 @@ for epoch in range(10):
         # Forward decoder
         opt.zero_grad()
         preds = modelDecoder(latent_decoder, batch.metadata.lat, batch.metadata.lon)
-        pred_flux = preds["ishf"].squeeze(1)
+        pred_sst = preds["sst"].squeeze(1)
 
-        # Loss
-        loss_value = F.l1_loss(pred_flux, target)
+        # Loss (only on ocean pixels)
+        loss_value = masked_loss(pred_sst, target, ocean_mask, F.l1_loss)
 
         # Backprop
         loss_value.backward()
         
         # ===== GRADIENT MONITORING =====
-        # Total gradient norm (before clipping)
         total_norm = 0.0
         for p in modelDecoder.parameters():
             if p.grad is not None:
@@ -294,29 +298,33 @@ for epoch in range(10):
         grad_norm_after = torch.nn.utils.clip_grad_norm_(modelDecoder.parameters(), max_norm=1.0)
         writer.add_scalar("train/gradient_norm_after_clip", grad_norm_after.item(), global_step)
         
-        # Log individual layer gradient norms (sample a few layers)
+        # Log individual layer gradient norms
         for name, param in modelDecoder.named_parameters():
             if param.grad is not None and 'weight' in name:
                 writer.add_scalar(f"gradient_norms/{name}", param.grad.norm().item(), global_step)
         
         opt.step()
 
-        # ===== MULTIPLE ERROR METRICS =====
+        # ===== MULTIPLE ERROR METRICS (only on ocean pixels) =====
         with torch.no_grad():
+            # Extract valid ocean predictions and targets
+            valid_pred = pred_sst[ocean_mask]
+            valid_target = target[ocean_mask]
+            
             # MAE (L1)
-            mae = F.l1_loss(pred_flux, target)
+            mae = F.l1_loss(valid_pred, valid_target)
             
             # MSE and RMSE
-            mse = F.mse_loss(pred_flux, target)
+            mse = F.mse_loss(valid_pred, valid_target)
             rmse = torch.sqrt(mse)
             
             # R² Score
-            ss_res = torch.sum((target - pred_flux) ** 2)
-            ss_tot = torch.sum((target - target.mean()) ** 2)
+            ss_res = torch.sum((valid_target - valid_pred) ** 2)
+            ss_tot = torch.sum((valid_target - valid_target.mean()) ** 2)
             r2 = 1 - ss_res / ss_tot
             
             # Relative error
-            relative_error = torch.mean(torch.abs(pred_flux - target) / (torch.abs(target) + 1e-8))
+            relative_error = torch.mean(torch.abs(valid_pred - valid_target) / (torch.abs(valid_target) + 1e-8))
             
             # Log all metrics
             writer.add_scalar("train/loss_step", loss_value.item(), global_step)
@@ -331,20 +339,22 @@ for epoch in range(10):
             train_rmse += rmse.item()
             train_r2 += r2.item()
         
-        # ===== PREDICTION STATISTICS =====
-        writer.add_scalar("train/pred_mean", pred_flux.mean().item(), global_step)
-        writer.add_scalar("train/pred_std", pred_flux.std().item(), global_step)
-        writer.add_scalar("train/pred_min", pred_flux.min().item(), global_step)
-        writer.add_scalar("train/pred_max", pred_flux.max().item(), global_step)
+        # ===== PREDICTION STATISTICS (only ocean pixels) =====
+        writer.add_scalar("train/pred_mean", valid_pred.mean().item(), global_step)
+        writer.add_scalar("train/pred_std", valid_pred.std().item(), global_step)
+        writer.add_scalar("train/pred_min", valid_pred.min().item(), global_step)
+        writer.add_scalar("train/pred_max", valid_pred.max().item(), global_step)
         
-        writer.add_scalar("train/target_mean", target.mean().item(), global_step)
-        writer.add_scalar("train/target_std", target.std().item(), global_step)
+        writer.add_scalar("train/target_mean", valid_target.mean().item(), global_step)
+        writer.add_scalar("train/target_std", valid_target.std().item(), global_step)
         
         # Correlation
-        pred_flat = pred_flux.flatten()
-        target_flat = target.flatten()
-        correlation = torch.corrcoef(torch.stack([pred_flat, target_flat]))[0, 1]
+        correlation = torch.corrcoef(torch.stack([valid_pred, valid_target]))[0, 1]
         writer.add_scalar("train/correlation", correlation.item(), global_step)
+        
+        # Ocean coverage
+        ocean_fraction = ocean_mask.float().mean()
+        writer.add_scalar("train/ocean_fraction", ocean_fraction.item(), global_step)
 
         # ===== PARAMETER DISTRIBUTIONS (every half epoch) =====
         if batch_idx == half_epoch or batch_idx == 0:
@@ -352,10 +362,7 @@ for epoch in range(10):
             step_number = epoch * 2 + (1 if batch_idx == half_epoch else 0)
             
             for name, param in modelDecoder.named_parameters():
-                # Log weight histograms
                 writer.add_histogram(f"weights/{name}", param, step_number)
-                
-                # Log weight statistics
                 writer.add_scalar(f"weight_stats/{name}_mean", param.mean().item(), step_number)
                 writer.add_scalar(f"weight_stats/{name}_std", param.std().item(), step_number)
                 writer.add_scalar(f"weight_stats/{name}_min", param.min().item(), step_number)
@@ -367,29 +374,50 @@ for epoch in range(10):
 
         # ===== SPATIAL ERROR MAP & IMAGES =====
         if batch_idx == 0:
-            # Original images
-            writer.add_image("train/pred_ishf", pred_flux[0].unsqueeze(0), global_step, dataformats="CHW")
-            writer.add_image("train/target_ishf", target[0].unsqueeze(0), global_step, dataformats="CHW")
-            writer.add_image("train/diff_ishf", (pred_flux[0] - target[0]).unsqueeze(0), global_step, dataformats="CHW")
+            # For visualization, replace NaN with 0 to avoid display issues
+            pred_vis = pred_sst[0].clone()
+            target_vis = target[0].clone()
+            pred_vis[~ocean_mask[0]] = 0
+            target_vis[~ocean_mask[0]] = 0
             
-            # Spatial error map (average absolute error across batch)
-            error_map = torch.abs(pred_flux - target).mean(dim=0)
+            writer.add_image("train/pred_sst", pred_vis.unsqueeze(0), global_step, dataformats="CHW")
+            writer.add_image("train/target_sst", target_vis.unsqueeze(0), global_step, dataformats="CHW")
+            
+            diff_vis = (pred_sst[0] - target[0]).clone()
+            diff_vis[~ocean_mask[0]] = 0
+            writer.add_image("train/diff_sst", diff_vis.unsqueeze(0), global_step, dataformats="CHW")
+            
+            # Spatial error map (average absolute error across batch, only ocean)
+            error_map = torch.abs(pred_sst - target)
+            error_map[~ocean_mask] = 0
+            error_map = error_map.mean(dim=0)
             writer.add_image("train/spatial_error_map", error_map.unsqueeze(0), global_step, dataformats="CHW")
             
             # Grid of multiple samples
-            n_samples = min(4, pred_flux.shape[0])
+            n_samples = min(4, pred_sst.shape[0])
+            
+            # Prepare grids with NaN replaced by 0
+            pred_grid_data = pred_sst[:n_samples].clone()
+            target_grid_data = target[:n_samples].clone()
+            diff_grid_data = (pred_sst[:n_samples] - target[:n_samples]).clone()
+            
+            for i in range(n_samples):
+                pred_grid_data[i][~ocean_mask[i]] = 0
+                target_grid_data[i][~ocean_mask[i]] = 0
+                diff_grid_data[i][~ocean_mask[i]] = 0
+            
             pred_grid = torchvision.utils.make_grid(
-                pred_flux[:n_samples].unsqueeze(1), 
+                pred_grid_data.unsqueeze(1), 
                 nrow=2, 
                 normalize=True
             )
             target_grid = torchvision.utils.make_grid(
-                target[:n_samples].unsqueeze(1), 
+                target_grid_data.unsqueeze(1), 
                 nrow=2, 
                 normalize=True
             )
             diff_grid = torchvision.utils.make_grid(
-                (pred_flux[:n_samples] - target[:n_samples]).unsqueeze(1), 
+                diff_grid_data.unsqueeze(1), 
                 nrow=2, 
                 normalize=True
             )
@@ -416,9 +444,10 @@ for epoch in range(10):
     all_targets = []
     
     with torch.no_grad():
-        for batch_idx, (batch, target) in enumerate(val_loader):
+        for batch_idx, (batch, target, ocean_mask) in enumerate(val_loader):
             batch = batch.to(device)
             target = target.to(device)
+            ocean_mask = ocean_mask.to(device)
             
             # Forward Aurora encoder
             with torch.inference_mode():
@@ -426,15 +455,19 @@ for epoch in range(10):
             
             # Forward decoder
             preds = modelDecoder(latent, batch.metadata.lat, batch.metadata.lon)
-            pred_flux = preds["ishf"].squeeze(1)
+            pred_sst = preds["sst"].squeeze(1)
+            
+            # Extract valid ocean pixels
+            valid_pred = pred_sst[ocean_mask]
+            valid_target = target[ocean_mask]
             
             # Multiple error metrics
-            mae = F.l1_loss(pred_flux, target)
-            mse = F.mse_loss(pred_flux, target)
+            mae = F.l1_loss(valid_pred, valid_target)
+            mse = F.mse_loss(valid_pred, valid_target)
             rmse = torch.sqrt(mse)
             
-            ss_res = torch.sum((target - pred_flux) ** 2)
-            ss_tot = torch.sum((target - target.mean()) ** 2)
+            ss_res = torch.sum((valid_target - valid_pred) ** 2)
+            ss_tot = torch.sum((valid_target - valid_target.mean()) ** 2)
             r2 = 1 - ss_res / ss_tot
             
             val_loss += mae.item()
@@ -443,22 +476,33 @@ for epoch in range(10):
             val_r2 += r2.item()
             
             # Collect for scatter plot
-            all_preds.append(pred_flux.cpu().flatten())
-            all_targets.append(target.cpu().flatten())
+            all_preds.append(valid_pred.cpu().flatten())
+            all_targets.append(valid_target.cpu().flatten())
             
             # Log first validation batch
             if batch_idx == 0:
-                writer.add_image("val/pred_ishf", pred_flux[0].unsqueeze(0), epoch, dataformats="CHW")
-                writer.add_image("val/target_ishf", target[0].unsqueeze(0), epoch, dataformats="CHW")
-                writer.add_image("val/diff_ishf", (pred_flux[0] - target[0]).unsqueeze(0), epoch, dataformats="CHW")
+                # For visualization, replace NaN with 0
+                pred_vis = pred_sst[0].clone()
+                target_vis = target[0].clone()
+                pred_vis[~ocean_mask[0]] = 0
+                target_vis[~ocean_mask[0]] = 0
+                
+                writer.add_image("val/pred_sst", pred_vis.unsqueeze(0), epoch, dataformats="CHW")
+                writer.add_image("val/target_sst", target_vis.unsqueeze(0), epoch, dataformats="CHW")
+                
+                diff_vis = (pred_sst[0] - target[0]).clone()
+                diff_vis[~ocean_mask[0]] = 0
+                writer.add_image("val/diff_sst", diff_vis.unsqueeze(0), epoch, dataformats="CHW")
                 
                 # Spatial error map
-                error_map = torch.abs(pred_flux - target).mean(dim=0)
+                error_map = torch.abs(pred_sst - target)
+                error_map[~ocean_mask] = 0
+                error_map = error_map.mean(dim=0)
                 writer.add_image("val/spatial_error_map", error_map.unsqueeze(0), epoch, dataformats="CHW")
                 
                 # Prediction statistics
-                writer.add_scalar("val/pred_mean", pred_flux.mean().item(), epoch)
-                writer.add_scalar("val/pred_std", pred_flux.std().item(), epoch)
+                writer.add_scalar("val/pred_mean", valid_pred.mean().item(), epoch)
+                writer.add_scalar("val/pred_std", valid_pred.std().item(), epoch)
     
     val_loss /= len(val_loader)
     val_mae /= len(val_loader)
@@ -486,14 +530,14 @@ for epoch in range(10):
         best_val_loss = val_loss
         torch.save(
             modelDecoder.state_dict(),
-            ckpt_dir / "ishf_decoder_best.ckpt"
+            ckpt_dir / "sst_decoder_best.ckpt"
         )
         print(f"  → New best model saved! (val_loss: {val_loss:.4f})")
     
     # Save regular checkpoint
     torch.save(
         modelDecoder.state_dict(),
-        ckpt_dir / f"ishf_decoder_epoch{epoch}.ckpt"
+        ckpt_dir / f"sst_decoder_epoch{epoch}.ckpt"
     )
     
     writer.flush()

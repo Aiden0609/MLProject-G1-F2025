@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --output=%x-%j.out   # standard output
 #SBATCH --error=%x-%j.err    # standard error
-#SBATCH --job-name=finetune-ishf
+#SBATCH --job-name=finetune-sst
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 echo "Hello World"
@@ -32,7 +32,7 @@ tensorboard --logdir="${logdir}/lightning_logs" \
 echo "TensorBoard started"
 
 # Run finetuning script
-python /home/$USER/projects/MLP\ Decoder/Finetuning/finetune_auroraLite.py 
+python /home/$USER/projects/MLP\ Decoder/Finetuning-SST/finetune_auroraLite_sst.py 
     
 
 echo "Job finished on $(date)"
