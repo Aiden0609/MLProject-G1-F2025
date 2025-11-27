@@ -108,8 +108,6 @@ with xr.open_dataset(
     skt = torch.from_numpy(era5_instant.variables["skt"].values) - 273
 
     sst = torch.where(ci > 0.5, torch.nan, sst)
-    print(torch.nanmean(ci))
-    print(np.nanstd(ci.numpy()))
     # sst = ci * istl1 + (1 - ci) * sst
 
     # sst = (sst + skt) / 2
@@ -127,6 +125,8 @@ with xr.open_dataset(
     # ishf = torch.from_numpy(era5_accum.variables["instant_sshf"].values)
     ishf = torch.from_numpy(era5_accum.variables["avg_ishf"].values)
     ishf = torch.where(custom_sh.isnan(), torch.nan, ishf)
+    print(torch.nanmean(ishf))
+    print(np.nanstd(ishf.numpy()))
     delta_ishf = ishf - torch.roll(ishf, 1)
 
     fig = plt.figure(figsize=(16, 9))

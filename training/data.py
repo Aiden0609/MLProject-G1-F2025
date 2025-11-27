@@ -79,7 +79,7 @@ class SSTDataset(Dataset):
 
         self.cur = None
         self.next = None  # target
-        _, self.next = self[-1]
+        # _, self.next = self[-1]
 
     def __len__(self) -> int:
         return len(self.times)
@@ -89,7 +89,10 @@ class SSTDataset(Dataset):
         :param index: Must be
         :type index: int
         """
-        if index != -1 and index != self.last_index + 1:
+        if index == 0:
+            self.cur = None
+            _, self.next = self[-1]
+        if (index not in (-1, 0)) and index != self.last_index + 1:
             raise ValueError("Must access data in order")
         else:
             self.last_index = index

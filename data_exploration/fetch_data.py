@@ -154,6 +154,9 @@ for name, variable in variables.items():
         dataset = dataset_pressure_levels
     else:
         dataset = dataset_single_levels
+        if name.startswith("static"):
+            request["day"] = ["01"]
+            request["time"] = ["06:00"]
 
     target = f"{datapath}/{name}.nc"  # Output file. Adapt as you wish.
 

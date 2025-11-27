@@ -33,10 +33,13 @@ model = AuroraPretrained(
 # normalization (yearly) means
 locations["sst"] = 17.1771
 locations["ci"] = 0.1589
+locations["sh"] = -12.8700
+
 
 # normalization (yearly) standard deviations
 scales["sst"] = 10.301042
 scales["ci"] = 0.32129946
+locations["sh"] = 12.011224
 
 
 def sensible_heat(
@@ -90,8 +93,11 @@ def loss(
     target_sh = sensible_heat(target_sst, target_t2m, target_wind_speed)
 
     norm_pred_sst = normalise_surf_var(pred_sst, "sst", model.surf_stats)
-    norm_target_sst = normalise_surf_var(target_sst, "sst", model.surf_stats)
-    phys_loss_pre = abs(norm_pred_sst - norm_target_sst) * abs(pred_sh - target_sh)
+    # norm_target_sst = normalise_surf_var(target_sst, "sst", model.surf_stats)
+    # phys_loss_pre = abs(norm_pred_sst - norm_target_sst) * abs(pred_sh - target_sh)
+    norm_pred_sh = normalise_surf_var(pred_sh, "sh", model.surf_stats)
+    norm_target_sh = normalise_surf_var(target_sh, "sh", model.surf_stats)
+    phys_loss_pre = abs(norm_pred_sh - norm_target_sh)
     # TODO is this the correct interpretation
     ice_cover = target["siconc"][-1]
     # Removes latent heat for ocean covered by more than `ice_threshold` ice
@@ -144,13 +150,16 @@ dataset = SSTDataset(
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True)
 
-model.load_checkpoint("microsoft/aurora", "aurora-0.25-pretrained.ckpt")
+model.load_checkpoint("microsoft/aurora", "aurora-0.25-pretrained.ckpt", strict=False)
+# TODO figure out token embeds
+# model.encoder.surf_token_embeds.weights[""]
+# model.encoder.atmos_token_embeds.weights
 model.configure_activation_checkpointing()
 model.train()
 model = model.to(device)
 over_size = 1 / (720 * 1440)
 
-opt = torch.optim.AdamW(model.parameters(), lr=3e-4)
+opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
 scaler = torch.amp.GradScaler()
 writer = SummaryWriter(log_dir="runs/sst_finetune")
 
@@ -172,13 +181,13 @@ for epoch in range(4):
             # Log the first sample prediction/target as images for a quick qualitative check.
             writer.add_image(
                 f"train/pred_sst_{epoch}",
-                prediction.surf_vars["sst"][-1],
+                prediction.to("cpu").surf_vars["sst"][-1],
                 global_step,
                 dataformats="CHW",
             )
             writer.add_image(
                 f"train/target_sst_{epoch}",
-                target_batch.surf_vars["sst"][-1],
+                target_batch.to("cpu").surf_vars["sst"][-1],
                 global_step,
                 dataformats="CHW",
             )
