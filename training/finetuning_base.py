@@ -1,20 +1,17 @@
-from datetime import datetime
 from pathlib import Path
 
 import torch
 import torch.nn as nn
-import xarray as xr
 
 from aurora import AuroraPretrained, Batch, Metadata
 from aurora.normalisation import (
     normalise_surf_var,
-    unnormalise_surf_var,
     locations,
     scales,
 )
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
-from data import SSTDataset, collate_fn
+from data import SSTDataset
 
 MAE = nn.L1Loss()
 
@@ -149,41 +146,41 @@ dataset = SSTDataset(
     data_path, ["sst"], surface_variables=["2t", "10u", "10v", "msl", "sst", "siconc"]
 )
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
-dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, collate_fn=collate_fn)
+dataloader = DataLoader(
+    dataset, batch_size=1, shuffle=True, pin_memory=True, collate_fn=dataset.collate_fn
+)
 
 # pretrained_weights = torch.load()
 
 model.load_checkpoint("microsoft/aurora", "aurora-0.25-pretrained.ckpt", strict=False)
 
 # TODO figure out token embeds
-#github.com/microsoft/aurora/issues/24
-model.encoder.surf_token_embeds.weights["sst"] =nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim, 1, *model.encoder.surf_token_embeds.kernel_size))
-# model.encoder.surf_token_embeds.weights["siconc"] = torch.zeros(model.encoder.surf_token_embeds.weights["siconc"].shape)
-model.encoder.surf_token_embeds.weights["siconc"] =nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim, 1, *model.encoder.surf_token_embeds.kernel_size))
-# model.encoder.surf_token_embeds.bias["sst"] = torch.zeros(model.encoder.surf_token_embeds.bias["sst"].shape)
-# model.encoder.surf_token_embeds.bias["sst"] = nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim))
-# model.encoder.surf_token_embeds.bias["siconc"] = nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim))
+# github.com/microsoft/aurora/issues/24
+model.encoder.surf_token_embeds.weights["sst"] = nn.Parameter(
+    torch.zeros(
+        model.encoder.surf_token_embeds.embed_dim,
+        1,
+        *model.encoder.surf_token_embeds.kernel_size,
+    )
+)
+
+model.encoder.surf_token_embeds.weights["siconc"] = nn.Parameter(
+    torch.zeros(
+        model.encoder.surf_token_embeds.embed_dim,
+        1,
+        *model.encoder.surf_token_embeds.kernel_size,
+    )
+)
+
 old_bias = model.encoder.surf_token_embeds.bias
 new_bias = torch.zeros(old_bias.shape)
 new_bias[:4] = old_bias[:4]
 model.encoder.surf_token_embeds.bias = nn.Parameter(new_bias)
-# new_surf_head_weight = torch.zeros((16, 6, 512))
-# new_surf_head_weight[:, :4, :] = model.encoder.surf_token_embeds.weights.reshape(16, 4, 512)
-# model.encoder.surf_token_embeds.weights = new_surf_head_weight.reshape(-1, 512)
-
-# new_surf_head_bias = torch.zeros((16, 6))
-# new_surf_head_bias[:, :4] = pretrained_weights['net.decoder.surf_head.bias'].reshape(16, 4)
-# pretrained_weights['net.decoder.surf_head.bias'] = new_surf_head_bias.reshape(-1)
-# # Still needed?
-# new_pretrained_weights = {}
-# for key, value in pretrained_weights.items():
-#     new_pretrained_weights[key[4:]] = value
-# model.load_state_dict(new_pretrained_weights)
 
 model.configure_activation_checkpointing()
 model.train()
 model = model.to(device)
-over_size = 1 / (720 * 1440)
+OVER_SIZE = 1 / (720 * 1440)
 
 opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
 scaler = torch.amp.GradScaler()
@@ -196,7 +193,7 @@ for epoch in range(4):
         target_batch: Batch
         opt.zero_grad()
         prediction: Batch = model(input_batch.to("cuda"))
-        loss_value: torch.Tensor = loss(prediction, target_batch, over_size)
+        loss_value: torch.Tensor = loss(prediction, target_batch, OVER_SIZE)
         scaler.scale(loss_value).backward()
         scaler.step(opt)
         scaler.update()

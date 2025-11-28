@@ -61,7 +61,6 @@ class SSTDataset(Dataset):
         self.surf_ds = self.surf_ds.rename(rename_dir)
         self.surf_variables = surface_variables
 
-
         self.lat = torch.from_numpy(self.surf_ds["latitude"].values)
         self.lon = torch.from_numpy(self.surf_ds["longitude"].values)
 
@@ -145,15 +144,49 @@ class SSTDataset(Dataset):
         self.next = self._get_batch(index + 1)
         return self.cur, self.next
 
+    def collate_fn(
+        self,
+        data: list[tuple[Batch, Batch]],
+    ) -> list[tuple[Batch, Batch]] | tuple[Batch, Batch]:
+        (inputs, targets) = zip(*data)
+        inputs: list[Batch]
+        targets: list[Batch]
+        (input_surf_vars, target_surf_vars) = [
+            {
+                k: torch.stack([b.surf_vars[k] for b in batches], dim=0)
+                for k in self.surf_variables
+            }
+            for batches in (inputs, targets)
+        ]
+        (input_atmos_vars, target_atmos_vars) = [
+            {
+                k: torch.stack([b.atmos_vars[k] for b in batches], dim=0)
+                for k in self.atmos_variables
+            }
+            for batches in (inputs, targets)
+        ]
 
-def collate_fn(
-    data: list[tuple[Batch, Batch]],
-) -> list[tuple[Batch, Batch]] | tuple[Batch, Batch]:
-    inputs, targets = zip(*data)
-    if len(inputs) == 1:
-        return inputs[0], targets[0]
-    else:
-        return inputs, targets
+        stacked_batch_metadata = Metadata(
+            lat=self.lat,
+            lon=self.lon,
+            time=tuple(b.metadata.time[0] for b in inputs),
+            atmos_levels=self.atmos_levels,
+        )
+        stacked_inputs = Batch(
+            surf_vars=input_surf_vars,
+            static_vars=self.static_vars,
+            atmos_vars=input_atmos_vars,
+            metadata=stacked_batch_metadata,
+        )
+
+        stacked_targets = Batch(
+            surf_vars=target_surf_vars,
+            static_vars=self.static_vars,
+            atmos_vars=target_atmos_vars,
+            metadata=stacked_batch_metadata,
+        )
+
+        return stacked_inputs, stacked_targets
 
 
 if __name__ == "__main__":
@@ -161,17 +194,20 @@ if __name__ == "__main__":
     dataset = SSTDataset(
         path,
         ["sst"],
-        surface_variables=["t2", "u10", "v10", "msl", "sst", "siconc"],
+        surface_variables=["2t", "10u", "10v", "msl", "sst", "siconc"],
         history=1,
     )
     dataloader = DataLoader(
         dataset,
-        batch_size=1,
+        batch_size=2,
         shuffle=True,
         pin_memory=True,
-        collate_fn=collate_fn,
+        collate_fn=dataset.collate_fn,
     )
     print(len(dataset))
     for batch_idx, (input_batch, target_batch) in enumerate(dataloader):
+        input_batch: Batch
         # input, target = dataset[0]
-        print(input_batch.surf_vars["sst"][-1].shape)
+        # x_atmos = torch.stack(tuple(input_batch.atmos_vars.values()), dim=2)
+        # print(x_atmos.size())
+        print(input_batch.atmos_vars["t"].size())
