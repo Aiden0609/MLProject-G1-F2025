@@ -13,7 +13,7 @@ class SSTDataset(Dataset):
         self,
         path: Path,
         targets: list[str],
-        history: int = 3,
+        history: int = 2,
         static_variables: list[str] = None,
         surface_variables: list[str] = None,
         atmosphere_variables: list[str] = None,
@@ -35,6 +35,7 @@ class SSTDataset(Dataset):
 
         self.path = path
         self.targets = targets
+        assert history >= 1, f"History must be at least 1, got {history}"
         self.history = history
 
         # ----- Static ----
@@ -84,7 +85,7 @@ class SSTDataset(Dataset):
         # 06:00.
         self.times = self.surf_ds["valid_time"].values.astype("datetime64[s]").tolist()
         # TODO why + 1
-        self.len = len(self.times) - history - 1
+        self.len = len(self.times) - history
 
         self.cur = None
         self.next = None  # target
@@ -98,7 +99,7 @@ class SSTDataset(Dataset):
             return self.loaded_batches[index]
 
         start = self.times[index]
-        target_time = self.times[index + self.history]
+        target_time = self.times[index + self.history - 1]
 
         time_slice = slice(start, target_time)
 
