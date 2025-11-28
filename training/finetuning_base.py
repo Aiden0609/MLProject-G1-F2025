@@ -3,7 +3,7 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from aurora import AuroraPretrained, Batch, Metadata
+from aurora import AuroraPretrained, Batch
 from aurora.normalisation import (
     normalise_surf_var,
     locations,
@@ -158,17 +158,19 @@ model.load_checkpoint("microsoft/aurora", "aurora-0.25-pretrained.ckpt", strict=
 # github.com/microsoft/aurora/issues/24
 model.encoder.surf_token_embeds.weights["sst"] = nn.Parameter(
     torch.zeros(
-        model.encoder.surf_token_embeds.embed_dim,
-        1,
-        *model.encoder.surf_token_embeds.kernel_size,
+        model.encoder.surf_token_embeds.weights["sst"].size()
+        # model.encoder.surf_token_embeds.embed_dim,
+        # 1,
+        # *model.encoder.surf_token_embeds.kernel_size,
     )
 )
 
 model.encoder.surf_token_embeds.weights["siconc"] = nn.Parameter(
     torch.zeros(
-        model.encoder.surf_token_embeds.embed_dim,
-        1,
-        *model.encoder.surf_token_embeds.kernel_size,
+        model.encoder.surf_token_embeds.weights["siconc"].size()
+        # model.encoder.surf_token_embeds.embed_dim,
+        # 1,
+        # *model.encoder.surf_token_embeds.kernel_size,
     )
 )
 

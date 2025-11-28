@@ -13,7 +13,7 @@ class SSTDataset(Dataset):
         self,
         path: Path,
         targets: list[str],
-        history: int = 2,
+        history: int = 3,
         static_variables: list[str] = None,
         surface_variables: list[str] = None,
         atmosphere_variables: list[str] = None,
