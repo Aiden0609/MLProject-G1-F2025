@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=0-01:00:00
-#SBATCH --account=def-weimin
+#SBATCH --account=def-lev
 # Request 288000 MB of memory (1/4th of the total node memory)
 #SBATCH --mem=288000M
 #SBATCH --gpus=h100:1
@@ -20,7 +20,7 @@ module load python/3.11 cuda cudnn
 module load mpi4py
 
 # Activate your enviroment
-source ~/envs/py311/bin/activate
+source ~/ENVS/py311/bin/activate
 
 # Variables for readability
 #logdir=/home/bmhod/scratch/saved

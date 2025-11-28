@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --time=01-00:00:00
-#SBATCH --account=def-weimin
+#SBATCH --account=def-lev
 #SBATCH --mem=288000M   #288 GB of RAM
 
 #SBATCH --cpus-per-task=12      # CPU cores/threads
@@ -21,7 +21,7 @@ module load nco   # for ncrcat
 
 
 # Activate your enviroment
-source ~/envs/py311/bin/activate
+source ~/ENVS/py311/bin/activate
 
 # Writing a requirement file
 #pip freeze > requirements.txt

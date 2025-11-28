@@ -48,9 +48,13 @@ class SSTDataset(Dataset):
         }
 
         # ----- Surface ----
+        # self.surf_ds = xr.open_dataset(
+        #     self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
+        # )
         self.surf_ds = xr.open_dataset(
-            self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
+            self.path / "era5_surface_2020_01.nc", engine="netcdf4", chunks=chunks
         )
+        
         self.surf_ds = self.surf_ds.sel(latitude=self.surf_ds["latitude"][:720])
         self.surf_variables = surface_variables
 
@@ -59,8 +63,11 @@ class SSTDataset(Dataset):
 
         # ----- Atmosphere ----
         # TODO not use remapped
+        # self.atmos_ds = xr.open_dataset(
+        #     self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
+        # )
         self.atmos_ds = xr.open_dataset(
-            self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
+            self.path / "era5_atmospheric_2020_01.nc", engine="netcdf4", chunks=chunks
         )
         self.atmos_ds = self.atmos_ds.sel(latitude=self.atmos_ds["latitude"][:720])
         self.atmos_levels = tuple(
@@ -80,6 +87,7 @@ class SSTDataset(Dataset):
         self.cur = None
         self.next = None  # target
         # _, self.next = self[-1]
+        self.last_index = -1
 
     def __len__(self) -> int:
         return len(self.times)
@@ -92,7 +100,8 @@ class SSTDataset(Dataset):
         if index == 0:
             self.cur = None
             _, self.next = self[-1]
-        if (index not in (-1, 0)) and index != self.last_index + 1:
+            self.last_index = 0
+        elif (index not in (-1, 0)) and index != self.last_index + 1:
             raise ValueError("Must access data in order")
         else:
             self.last_index = index
@@ -140,7 +149,8 @@ class SSTDataset(Dataset):
 
 
 if __name__ == "__main__":
-    path = Path("../data_exploration/data")
+    # path = Path("../data_exploration/data")
+    path = Path("$HOME/scratch/data/finetune-data-2020-2024")
     dataset = SSTDataset(
         path,
         ["sst"],

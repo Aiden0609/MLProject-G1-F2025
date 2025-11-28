@@ -24,7 +24,7 @@ MAE = nn.L1Loss()
 
 
 model = AuroraPretrained(
-    surf_vars=("2t", "10u", "10v", "msl", "sst", "ci"),
+    surf_vars=("2t", "10u", "10v", "msl", "sst", "siconc"),
     static_vars=("lsm", "z", "slt"),
     atmos_vars=("z", "u", "v", "t", "q"),
     autocast=True,
@@ -143,17 +143,43 @@ def loss(
 if not torch.cuda.is_available():
     raise RuntimeError("Need CUDA for Aurora fine-tuning.")
 device = torch.device("cuda")
-data_path = Path("./data/downloads")
+data_path = Path("scratch/data/finetune-data-2020-2024")
+# data_path = Path("./data/downloads")
 dataset = SSTDataset(
     data_path, ["sst"], surface_variables=["t2m", "u10", "v10", "msl", "sst", "siconc"]
 )
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True)
 
+# pretrained_weights = torch.load()
+
 model.load_checkpoint("microsoft/aurora", "aurora-0.25-pretrained.ckpt", strict=False)
+
 # TODO figure out token embeds
-# model.encoder.surf_token_embeds.weights[""]
-# model.encoder.atmos_token_embeds.weights
+#github.com/microsoft/aurora/issues/24
+model.encoder.surf_token_embeds.weights["sst"] =nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim, 1, *model.encoder.surf_token_embeds.kernel_size))
+# model.encoder.surf_token_embeds.weights["siconc"] = torch.zeros(model.encoder.surf_token_embeds.weights["siconc"].shape)
+model.encoder.surf_token_embeds.weights["siconc"] =nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim, 1, *model.encoder.surf_token_embeds.kernel_size))
+# model.encoder.surf_token_embeds.bias["sst"] = torch.zeros(model.encoder.surf_token_embeds.bias["sst"].shape)
+# model.encoder.surf_token_embeds.bias["sst"] = nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim))
+# model.encoder.surf_token_embeds.bias["siconc"] = nn.Parameter(torch.zeros(model.encoder.surf_token_embeds.embed_dim))
+old_bias = model.encoder.surf_token_embeds.bias
+new_bias = torch.zeros(old_bias.shape)
+new_bias[:4] = old_bias[:4]
+model.encoder.surf_token_embeds.bias = nn.Parameter(new_bias)
+# new_surf_head_weight = torch.zeros((16, 6, 512))
+# new_surf_head_weight[:, :4, :] = model.encoder.surf_token_embeds.weights.reshape(16, 4, 512)
+# model.encoder.surf_token_embeds.weights = new_surf_head_weight.reshape(-1, 512)
+
+# new_surf_head_bias = torch.zeros((16, 6))
+# new_surf_head_bias[:, :4] = pretrained_weights['net.decoder.surf_head.bias'].reshape(16, 4)
+# pretrained_weights['net.decoder.surf_head.bias'] = new_surf_head_bias.reshape(-1)
+# # Still needed?
+# new_pretrained_weights = {}
+# for key, value in pretrained_weights.items():
+#     new_pretrained_weights[key[4:]] = value
+# model.load_state_dict(new_pretrained_weights)
+
 model.configure_activation_checkpointing()
 model.train()
 model = model.to(device)
