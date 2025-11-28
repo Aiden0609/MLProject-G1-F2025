@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import xarray as xr
+from torch.utils.data import DataLoader
 
 
 class SSTDataset(Dataset):
@@ -48,13 +49,13 @@ class SSTDataset(Dataset):
         }
 
         # ----- Surface ----
-        # self.surf_ds = xr.open_dataset(
-        #     self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
-        # )
         self.surf_ds = xr.open_dataset(
-            self.path / "era5_surface_2020_01.nc", engine="netcdf4", chunks=chunks
+            self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
         )
-        
+        # self.surf_ds = xr.open_dataset(
+        #     self.path / "era5_surface_2020_01.nc", engine="netcdf4", chunks=chunks
+        # )
+
         self.surf_ds = self.surf_ds.sel(latitude=self.surf_ds["latitude"][:720])
         self.surf_variables = surface_variables
 
@@ -62,13 +63,12 @@ class SSTDataset(Dataset):
         self.lon = torch.from_numpy(self.surf_ds["longitude"].values)
 
         # ----- Atmosphere ----
-        # TODO not use remapped
-        # self.atmos_ds = xr.open_dataset(
-        #     self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
-        # )
         self.atmos_ds = xr.open_dataset(
-            self.path / "era5_atmospheric_2020_01.nc", engine="netcdf4", chunks=chunks
+            self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
         )
+        # self.atmos_ds = xr.open_dataset(
+        #     self.path / "era5_atmospheric_2020_01.nc", engine="netcdf4", chunks=chunks
+        # )
         self.atmos_ds = self.atmos_ds.sel(latitude=self.atmos_ds["latitude"][:720])
         self.atmos_levels = tuple(
             int(level) for level in self.atmos_ds["pressure_level"].values
@@ -82,37 +82,23 @@ class SSTDataset(Dataset):
         # 06:00.
         self.times = self.surf_ds["valid_time"].values.astype("datetime64[s]").tolist()
         # TODO why + 1
-        self.len = len(self.times) - history + 1
+        self.len = len(self.times) - history - 1
 
         self.cur = None
         self.next = None  # target
-        # _, self.next = self[-1]
-        self.last_index = -1
+        self.loaded_batches: dict[int, Batch] = {}
 
     def __len__(self) -> int:
-        return len(self.times)
+        return self.len
 
-    def __getitem__(self, index: int):
-        """
-        :param index: Must be
-        :type index: int
-        """
-        if index == 0:
-            self.cur = None
-            _, self.next = self[-1]
-            self.last_index = 0
-        elif (index not in (-1, 0)) and index != self.last_index + 1:
-            raise ValueError("Must access data in order")
-        else:
-            self.last_index = index
+    def _get_batch(self, index: int) -> Batch:
+        if index in self.loaded_batches:
+            return self.loaded_batches[index]
 
-        index += 1
-        self.cur = self.next
         start = self.times[index]
-        end = self.times[index + self.history]
-        target_time = self.times[index + self.history + 1]
+        target_time = self.times[index + self.history]
 
-        time_slice = slice(start, end)
+        time_slice = slice(start, target_time)
 
         sliced_surf = self.surf_ds.sel(valid_time=time_slice)
         sliced_atmos = self.atmos_ds.sel(valid_time=time_slice)
@@ -135,7 +121,7 @@ class SSTDataset(Dataset):
         metadata = Metadata(
             lat=self.lat,
             lon=self.lon,
-            time=(np.array(target_time, dtype="datetime64[s]").item(),),
+            time=(target_time,),
             atmos_levels=self.atmos_levels,
         )
         batch = Batch(
@@ -144,18 +130,46 @@ class SSTDataset(Dataset):
             atmos_vars=atmos_vars,
             metadata=metadata,
         )
-        self.next = batch
+        self.loaded_batches[index] = batch
+        return batch
+
+    def __getitem__(self, index: int) -> tuple[Batch, Batch]:
+        """
+        :param index:
+        :type index: int
+        """
+        print(index)
+        self.cur = self._get_batch(index)
+        self.next = self._get_batch(index + 1)
         return self.cur, self.next
 
 
+def collate_fn(
+    data: list[tuple[Batch, Batch]],
+) -> list[tuple[Batch, Batch]] | tuple[Batch, Batch]:
+    inputs, targets = zip(*data)
+    if len(inputs) == 1:
+        return inputs[0], targets[0]
+    else:
+        return inputs, targets
+
+
 if __name__ == "__main__":
-    # path = Path("../data_exploration/data")
-    path = Path("$HOME/scratch/data/finetune-data-2020-2024")
+    path = Path("../data_exploration/data")
     dataset = SSTDataset(
         path,
         ["sst"],
         surface_variables=["t2m", "u10", "v10", "msl", "sst", "siconc"],
-        history=0,
+        history=1,
     )
-    input, target = dataset[0]
-    print(input.surf_vars["sst"][-1].shape)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=1,
+        shuffle=True,
+        pin_memory=True,
+        collate_fn=collate_fn,
+    )
+    print(len(dataset))
+    for batch_idx, (input_batch, target_batch) in enumerate(dataloader):
+        # input, target = dataset[0]
+        print(input_batch.surf_vars["sst"][-1].shape)
