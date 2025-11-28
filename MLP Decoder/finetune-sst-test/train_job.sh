@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=07-00:00:00
+#SBATCH --time=00-06:06:00
 #SBATCH --account=def-weimin
 #SBATCH --mem=288000M
 #SBATCH --gpus=h100:1
@@ -8,7 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --output=%x-%j.out   # standard output
 #SBATCH --error=%x-%j.err    # standard error
-#SBATCH --job-name=finetune-ishf
+#SBATCH --job-name=test-sst
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 echo "Hello World"
@@ -21,7 +21,7 @@ module load mpi4py
 source ~/envs/py311/bin/activate
 
 # Start TensorBoard
-tensorboard --logdir="/scratch/${USER}/runs/ishf_finetune" \
+tensorboard --logdir="/scratch/${USER}/runs/sst_finetune_test" \
                --host 0.0.0.0 \
                --load_fast false &
 echo "TensorBoard started"
@@ -33,7 +33,7 @@ echo "ssh -N -L 6006:$(hostname):6006 $USER@<cluster>.computecanada.ca"
 echo "Then open http://localhost:6006 in your browser"
 
 # Run finetuning script
-python /home/$USER/projects/MLP\ Decoder/Finetuning/finetune_auroraLite.py 
+python /home/$USER/projects/MLP\ Decoder/finetune-sst-test/finetune-sst-test.py 
     
 
 echo "Job finished on $(date)"
