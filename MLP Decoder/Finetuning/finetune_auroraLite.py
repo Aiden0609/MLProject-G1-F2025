@@ -74,7 +74,7 @@ modelAurora = modelAurora.to(device)
 modelAurora.eval()
 
 modelDecoder = MLPDecoderLite(
-    surf_vars_new=["ishf"],
+    surf_vars_new=["isshf"],
     patch_size=modelAurora.decoder.patch_size,
     embed_dim=2 * modelAurora.encoder.embed_dim,
     hidden_dims=[512, 512, 256],
@@ -90,47 +90,47 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 )
 
 # TensorBoard
-log_dir = f"/scratch/{os.environ['USER']}/runs/ishf_finetune"
+log_dir = f"/scratch/{os.environ['USER']}/runs/isshf_finetune"
 os.makedirs(log_dir, exist_ok=True)
 writer = SummaryWriter(log_dir=log_dir)
 global_step = 0
 
 # Best model tracking
 best_val_loss = float('inf')
-ckpt_dir = Path(f"/scratch/{os.environ['USER']}/checkpoints/ishf_finetune")
+ckpt_dir = Path(f"/scratch/{os.environ['USER']}/checkpoints/isshf_finetune")
 ckpt_dir.mkdir(parents=True, exist_ok=True)
 
 # Settings
 accumulation_steps = 22
 history = 2
 
-# Compute global ISHF statistics for consistent colormap normalization
-print("Computing ISHF statistics from training data...")
-ishf_values = []
+# Compute global ISSHF statistics for consistent colormap normalization
+print("Computing ISSHF statistics from training data...")
+isshf_values = []
 for flux_file in train_flux_files[:3]:  # Sample first 3 months for efficiency
     flux_sample = xr.open_dataset(flux_file).isel(latitude=slice(0, 720))
-    ishf_values.append(flux_sample["ishf"].values.flatten())
+    isshf_values.append(flux_sample["isshf"].values.flatten())
     flux_sample.close()
 
-ishf_values = np.concatenate(ishf_values)
-ishf_p1 = np.percentile(ishf_values, 1)   # 1st percentile
-ishf_p99 = np.percentile(ishf_values, 99)  # 99th percentile
-ishf_max_abs = max(abs(ishf_p1), abs(ishf_p99))
-vmin, vmax = -ishf_max_abs, ishf_max_abs  # Symmetric range for diverging colormap
+isshf_values = np.concatenate(isshf_values)
+isshf_p1 = np.percentile(isshf_values, 1)   # 1st percentile
+isshf_p99 = np.percentile(isshf_values, 99)  # 99th percentile
+isshf_max_abs = max(abs(isshf_p1), abs(isshf_p99))
+vmin, vmax = -isshf_max_abs, isshf_max_abs  # Symmetric range for diverging colormap
 
-print(f"ISHF range for colormap: [{vmin:.2f}, {vmax:.2f}] W/m²")
+print(f"ISSHF range for colormap: [{vmin:.2f}, {vmax:.2f}] W/m²")
 
-# Create colormap function for ISHF visualization
-def create_ishf_colormap(ishf_tensor):
-    """Convert ISHF tensor to RGB image with colormap using global range"""
-    ishf_np = ishf_tensor.cpu().numpy()
+# Create colormap function for ISSHF visualization
+def create_isshf_colormap(isshf_tensor):
+    """Convert ISSHF tensor to RGB image with colormap using global range"""
+    isshf_np = isshf_tensor.cpu().numpy()
     
     # Normalize using global statistics
-    ishf_norm = np.clip((ishf_np - vmin) / (vmax - vmin), 0, 1)
+    isshf_norm = np.clip((isshf_np - vmin) / (vmax - vmin), 0, 1)
     
     # Apply colormap (RdBu_r: blue for negative, red for positive)
     cmap = cm.get_cmap('RdBu_r')
-    rgb = cmap(ishf_norm)[:, :, :3]  # Drop alpha channel
+    rgb = cmap(isshf_norm)[:, :, :3]  # Drop alpha channel
     
     return torch.from_numpy(rgb).permute(2, 0, 1).float()  # CHW format
 
@@ -179,9 +179,9 @@ for epoch in range(10):
             surf_hist = surf.isel({time_dim: slice(t-history, t)})
             atmos_hist = atmos.isel({time_dim: slice(t-history, t)})
             
-            # Extract target ISHF
+            # Extract target ISSHF
             target = torch.from_numpy(
-                flux["ishf"].isel({time_dim: t}).values
+                flux["isshf"].isel({time_dim: t}).values
             ).float().unsqueeze(0).to(device)
             
             # Create Batch object
@@ -218,10 +218,10 @@ for epoch in range(10):
                 
             latent_decoder = latent.detach().clone()
             preds = modelDecoder(latent_decoder, batch.metadata.lat, batch.metadata.lon)
-            pred_ishf = preds["ishf"].squeeze(1)
+            pred_isshf = preds["isshf"].squeeze(1)
             
             # Compute loss
-            loss_value = F.l1_loss(pred_ishf, target) / accumulation_steps
+            loss_value = F.l1_loss(pred_isshf, target) / accumulation_steps
             loss_value.backward()
             
             batch_loss += loss_value.item() * accumulation_steps
@@ -258,7 +258,7 @@ for epoch in range(10):
                         atmos_hist_val = val_atmos_subset.isel(valid_time=slice(t_val-history, t_val))
                         
                         target_val = torch.from_numpy(
-                            val_flux_subset["ishf"].isel(valid_time=t_val).values
+                            val_flux_subset["isshf"].isel(valid_time=t_val).values
                         ).float().unsqueeze(0).to(device)
                         
                         batch_val = Batch(
@@ -293,9 +293,9 @@ for epoch in range(10):
                             
                         latent_decoder_val = latent_val.detach().clone()
                         preds_val = modelDecoder(latent_decoder_val, batch_val.metadata.lat, batch_val.metadata.lon)
-                        pred_ishf_val = preds_val["ishf"].squeeze(1)
+                        pred_isshf_val = preds_val["isshf"].squeeze(1)
                         
-                        mae_val = F.l1_loss(pred_ishf_val, target_val)
+                        mae_val = F.l1_loss(pred_isshf_val, target_val)
                         val_loss_step += mae_val.item()
                         val_count += 1
                 
@@ -307,13 +307,13 @@ for epoch in range(10):
                 
                 # Visualizations every 100 steps with colormap
                 if global_step % 100 == 0:
-                    pred_colored = create_ishf_colormap(pred_ishf[0])
-                    target_colored = create_ishf_colormap(target[0])
-                    diff_colored = create_ishf_colormap(pred_ishf[0] - target[0])
+                    pred_colored = create_isshf_colormap(pred_isshf[0])
+                    target_colored = create_isshf_colormap(target[0])
+                    diff_colored = create_isshf_colormap(pred_isshf[0] - target[0])
                     
-                    writer.add_image("ishf/prediction", pred_colored, global_step)
-                    writer.add_image("ishf/target", target_colored, global_step)
-                    writer.add_image("ishf/difference", diff_colored, global_step)
+                    writer.add_image("isshf/prediction", pred_colored, global_step)
+                    writer.add_image("isshf/target", target_colored, global_step)
+                    writer.add_image("isshf/difference", diff_colored, global_step)
                     
                     print(f"Epoch {epoch+1} | Step {global_step} | Train: {train_loss_step:.4f} | Val: {val_loss_step:.4f}")
                 
@@ -349,14 +349,14 @@ for epoch in range(10):
         best_val_loss = epoch_val_loss
         torch.save(
             modelDecoder.state_dict(),
-            ckpt_dir / "ishf_decoder_best.ckpt"
+            ckpt_dir / "isshf_decoder_best.ckpt"
         )
         print(f"✓ New best model saved! (val_loss: {epoch_val_loss:.4f})\n")
     
     # Save epoch checkpoint
     torch.save(
         modelDecoder.state_dict(),
-        ckpt_dir / f"ishf_decoder_epoch{epoch}.ckpt"
+        ckpt_dir / f"isshf_decoder_epoch{epoch}.ckpt"
     )
     
     writer.flush()
