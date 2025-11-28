@@ -14,7 +14,7 @@ from aurora.normalisation import (
 )
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
-from data import SSTDataset
+from data import SSTDataset, collate_fn
 
 MAE = nn.L1Loss()
 
@@ -44,14 +44,14 @@ locations["sh"] = 12.011224
 
 def sensible_heat(
     sst: torch.Tensor,
-    t2m: torch.Tensor,
+    t2: torch.Tensor,
     wind_speed: torch.Tensor,
     rhoao: float = 1.2250,  # density at 15C
     cp: float = 1.006e3,  # 1.006kJ
     cs: float = 1e-3,
     # cs: float = 0.9e-3,
 ):
-    return -rhoao * cp * cs * wind_speed * (sst - t2m)
+    return -rhoao * cp * cs * wind_speed * (sst - t2)
 
 
 def loss(
@@ -77,20 +77,20 @@ def loss(
     # According to https://microsoft.github.io/aurora/batch.html#model-output, yes
     surf_values = pred.surf_vars.values()
     pred_sst = surf_values["sst"][-1]
-    pred_t2m = surf_values["t2m"][-1]
+    pred_t2 = surf_values["t2"][-1]
     pred_u10 = surf_values["u10"][-1]
     pred_v10 = surf_values["v10"][-1]
     pred_wind_speed = torch.sqrt(pred_u10**2, pred_v10**2)
 
     # only the last value in target
     target_sst = target["sst"][-1]
-    target_t2m = target["t2m"][-1]
+    target_t2 = target["t2"][-1]
     target_u10 = target["u10"][-1]
     target_v10 = target["v10"][-1]
     target_wind_speed = torch.sqrt(target_u10**2, target_v10**2)
 
-    pred_sh = sensible_heat(pred_sst, pred_t2m, pred_wind_speed)
-    target_sh = sensible_heat(target_sst, target_t2m, target_wind_speed)
+    pred_sh = sensible_heat(pred_sst, pred_t2, pred_wind_speed)
+    target_sh = sensible_heat(target_sst, target_t2, target_wind_speed)
 
     norm_pred_sst = normalise_surf_var(pred_sst, "sst", model.surf_stats)
     # norm_target_sst = normalise_surf_var(target_sst, "sst", model.surf_stats)
@@ -146,10 +146,10 @@ device = torch.device("cuda")
 data_path = Path("scratch/data/finetune-data-2020-2024")
 # data_path = Path("./data/downloads")
 dataset = SSTDataset(
-    data_path, ["sst"], surface_variables=["t2m", "u10", "v10", "msl", "sst", "siconc"]
+    data_path, ["sst"], surface_variables=["t2", "u10", "v10", "msl", "sst", "siconc"]
 )
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
-dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True)
+dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, collate_fn=collate_fn)
 
 # pretrained_weights = torch.load()
 

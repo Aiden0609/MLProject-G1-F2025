@@ -49,26 +49,29 @@ class SSTDataset(Dataset):
         }
 
         # ----- Surface ----
-        self.surf_ds = xr.open_dataset(
-            self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
-        )
         # self.surf_ds = xr.open_dataset(
-        #     self.path / "era5_surface_2020_01.nc", engine="netcdf4", chunks=chunks
+        #     self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
         # )
+        self.surf_ds = xr.open_dataset(
+            self.path / "era5_surface_2020_01.nc", engine="netcdf4", chunks=chunks
+        )
 
         self.surf_ds = self.surf_ds.sel(latitude=self.surf_ds["latitude"][:720])
+        if "t2" in surface_variables:
+            self.surf_ds.rename({"t2m": "t2"})
         self.surf_variables = surface_variables
+
 
         self.lat = torch.from_numpy(self.surf_ds["latitude"].values)
         self.lon = torch.from_numpy(self.surf_ds["longitude"].values)
 
         # ----- Atmosphere ----
-        self.atmos_ds = xr.open_dataset(
-            self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
-        )
         # self.atmos_ds = xr.open_dataset(
-        #     self.path / "era5_atmospheric_2020_01.nc", engine="netcdf4", chunks=chunks
+        #     self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
         # )
+        self.atmos_ds = xr.open_dataset(
+            self.path / "era5_atmospheric_2020_01.nc", engine="netcdf4", chunks=chunks
+        )
         self.atmos_ds = self.atmos_ds.sel(latitude=self.atmos_ds["latitude"][:720])
         self.atmos_levels = tuple(
             int(level) for level in self.atmos_ds["pressure_level"].values
@@ -159,7 +162,7 @@ if __name__ == "__main__":
     dataset = SSTDataset(
         path,
         ["sst"],
-        surface_variables=["t2m", "u10", "v10", "msl", "sst", "siconc"],
+        surface_variables=["t2", "u10", "v10", "msl", "sst", "siconc"],
         history=1,
     )
     dataloader = DataLoader(
