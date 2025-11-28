@@ -70,15 +70,15 @@ def robust_retrieve(dataset, request_dict, outfile, max_retries=8):
 
 
 # check if a file is readable
-def print_dimensions(path):
+def print_dimensions(path) -> bool:
     try:
         ds = xr.open_dataset(path)
         print(f"    dims: {dict(ds.dims)}")
         ds.close()
+        return True
     except Exception as e:
         print(f"    CORRUPT: cannot open ({e})")
-        print("    Deliting file")
-        os.remove(path)
+        return False
 
 
 # static data
@@ -120,7 +120,7 @@ for year in years:
 
         if out_file.exists():
             print(f"  exists: {out_file.name}")
-            print_dimensions(out_file)
+            not_corrupt = print_dimensions(out_file)
             continue
 
         print(f"  downloading {out_file.name}")

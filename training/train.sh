@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=0-01:00:00
+#SBATCH --time=0-00:15:00
 #SBATCH --account=def-lev
 # Request 288000 MB of memory (1/4th of the total node memory)
 #SBATCH --mem=288000M
