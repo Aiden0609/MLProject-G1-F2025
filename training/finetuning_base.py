@@ -32,13 +32,13 @@ model = AuroraPretrained(
 
 # normalization (yearly) means
 locations["sst"] = 17.1771
-locations["ci"] = 0.1589
+locations["siconc"] = 0.1589
 locations["sh"] = -12.8700
 
 
 # normalization (yearly) standard deviations
 scales["sst"] = 10.301042
-scales["ci"] = 0.32129946
+scales["siconc"] = 0.32129946
 locations["sh"] = 12.011224
 
 
@@ -77,16 +77,16 @@ def loss(
     # According to https://microsoft.github.io/aurora/batch.html#model-output, yes
     surf_values = pred.surf_vars.values()
     pred_sst = surf_values["sst"][-1]
-    pred_t2 = surf_values["t2"][-1]
-    pred_u10 = surf_values["u10"][-1]
-    pred_v10 = surf_values["v10"][-1]
+    pred_t2 = surf_values["2t"][-1]
+    pred_u10 = surf_values["10u"][-1]
+    pred_v10 = surf_values["10v"][-1]
     pred_wind_speed = torch.sqrt(pred_u10**2, pred_v10**2)
 
     # only the last value in target
     target_sst = target["sst"][-1]
-    target_t2 = target["t2"][-1]
-    target_u10 = target["u10"][-1]
-    target_v10 = target["v10"][-1]
+    target_t2 = target["2t"][-1]
+    target_u10 = target["10u"][-1]
+    target_v10 = target["10v"][-1]
     target_wind_speed = torch.sqrt(target_u10**2, target_v10**2)
 
     pred_sh = sensible_heat(pred_sst, pred_t2, pred_wind_speed)
@@ -146,7 +146,7 @@ device = torch.device("cuda")
 data_path = Path("scratch/data/finetune-data-2020-2024")
 # data_path = Path("./data/downloads")
 dataset = SSTDataset(
-    data_path, ["sst"], surface_variables=["t2", "u10", "v10", "msl", "sst", "siconc"]
+    data_path, ["sst"], surface_variables=["2t", "10u", "10v", "msl", "sst", "siconc"]
 )
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
 dataloader = DataLoader(dataset, batch_size=1, shuffle=True, pin_memory=True, collate_fn=collate_fn)

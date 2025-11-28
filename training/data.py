@@ -57,8 +57,8 @@ class SSTDataset(Dataset):
         )
 
         self.surf_ds = self.surf_ds.sel(latitude=self.surf_ds["latitude"][:720])
-        if "t2" in surface_variables:
-            self.surf_ds.rename({"t2m": "t2"})
+        rename_dir = {"t2m": "2t", "u10": "10u", "v10": "10v"}
+        self.surf_ds = self.surf_ds.rename(rename_dir)
         self.surf_variables = surface_variables
 
 
@@ -141,7 +141,6 @@ class SSTDataset(Dataset):
         :param index:
         :type index: int
         """
-        print(index)
         self.cur = self._get_batch(index)
         self.next = self._get_batch(index + 1)
         return self.cur, self.next
