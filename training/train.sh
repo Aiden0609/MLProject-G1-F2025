@@ -16,8 +16,7 @@ echo "Hello World"
 nvidia-smi
 
 # Load needed python and cuda modules
-module load python/3.11 cuda cudnn
-module load mpi4py
+module load python/3.11 cuda cudnn mpi4py
 
 # Activate your enviroment
 source ~/ENVS/py311/bin/activate
