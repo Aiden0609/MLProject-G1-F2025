@@ -73,7 +73,6 @@ def loss(
     # TODO check if only last value of target is needed?
     # According to https://microsoft.github.io/aurora/batch.html#model-output, yes
     pred_surf_values = pred.surf_vars#.values()
-    print(pred_surf_values["sst"].shape)
     pred_sst = pred_surf_values["sst"][:,-1]
     pred_t2 = pred_surf_values["2t"][:,-1]
     pred_u10 = pred_surf_values["10u"][:,-1]
@@ -82,6 +81,7 @@ def loss(
 
     # only the last value in target
     target_surf_values = target.surf_vars
+    
     target_sst = target_surf_values["sst"][:,-1]
     target_t2 = target_surf_values["2t"][:,-1]
     target_u10 = target_surf_values["10u"][:,-1]
@@ -97,12 +97,12 @@ def loss(
     norm_pred_sh = normalise_surf_var(pred_sh, "sh", model.surf_stats)
     norm_target_sh = normalise_surf_var(target_sh, "sh", model.surf_stats)
     phys_loss_pre = abs(norm_pred_sh - norm_target_sh)
-    # TODO is this the correct interpretation
-    ice_cover = target["siconc"][-1]
+
+    ice_cover = target_surf_values["siconc"][:,-1]
     # Removes latent heat for ocean covered by more than `ice_threshold` ice
     phys_loss_pre = torch.where(ice_cover > ice_threshold, torch.nan, phys_loss_pre)
 
-    phys_loss = torch.nansum(phys_loss_pre) * over_size
+    phys_loss = torch.nanmean(phys_loss_pre) #* over_size
 
     mae_loss = nn.functional.mse_loss(norm_pred_sst, target_sst)
 
@@ -197,8 +197,8 @@ for epoch in range(4):
         input_batch: Batch
         target_batch: Batch
         opt.zero_grad()
-        prediction: Batch = model(input_batch.to("cuda"))
-        loss_value: torch.Tensor = loss(prediction, target_batch, OVER_SIZE)
+        prediction: Batch = model(input_batch.to(device))
+        loss_value: torch.Tensor = loss(prediction, target_batch.to(device), OVER_SIZE)
         scaler.scale(loss_value).backward()
         scaler.step(opt)
         scaler.update()
