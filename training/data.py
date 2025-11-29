@@ -8,6 +8,29 @@ import xarray as xr
 from torch.utils.data import DataLoader
 
 
+def _check_available_data(
+    path: Path, years: list[int] = None
+) -> tuple[list[Path], list[Path]]:
+    if years is None:
+        years = [2020, 2021, 2022, 2023, 2024]
+
+    surf_files = []
+    atmos_files = []
+    for year in years:
+        for month in range(1, 13):
+
+            surf_file = path / f"era5_surface_{year}_{month:02d}.nc"
+            atmos_file = path / f"era5_atmospheric_{year}_{month:02d}.nc"
+
+            if surf_file.exists() and atmos_file.exists():
+                surf_files.append(surf_file)
+                atmos_files.append(atmos_file)
+            else:
+                print(f"Warning: Missing files for {year}-{month:02d}")
+
+    return surf_files, atmos_files
+
+
 class SSTDataset(Dataset):
     def __init__(
         self,
@@ -23,7 +46,7 @@ class SSTDataset(Dataset):
         if static_variables is None:
             static_variables = ["z", "slt", "lsm"]
         if surface_variables is None:
-            surface_variables = ["t2m", "u10", "v10", "msl"]
+            surface_variables = ["2t", "10u", "10v", "msl"]
         if atmosphere_variables is None:
             atmosphere_variables = ["z", "u", "v", "t", "q"]
 
@@ -48,14 +71,12 @@ class SSTDataset(Dataset):
             var_name: torch.from_numpy(self.static_ds[var_name].values[0])
             for var_name in static_variables
         }
-
+        surf_files, atmos_files = _check_available_data(path)
         # ----- Surface ----
         # self.surf_ds = xr.open_dataset(
         #     self.path / "surface-level.nc", engine="netcdf4", chunks=chunks
         # )
-        self.surf_ds = xr.open_dataset(
-            self.path / "era5_surface_2020_01.nc", engine="netcdf4", chunks=chunks
-        )
+        self.surf_ds = xr.open_mfdataset(surf_files, engine="netcdf4", chunks=chunks)
 
         self.surf_ds = self.surf_ds.sel(latitude=self.surf_ds["latitude"][:720])
         rename_dir = {"t2m": "2t", "u10": "10u", "v10": "10v"}
@@ -69,9 +90,7 @@ class SSTDataset(Dataset):
         # self.atmos_ds = xr.open_dataset(
         #     self.path / "atmospheric.nc", engine="netcdf4", chunks=chunks
         # )
-        self.atmos_ds = xr.open_dataset(
-            self.path / "era5_atmospheric_2020_01.nc", engine="netcdf4", chunks=chunks
-        )
+        self.atmos_ds = xr.open_mfdataset(atmos_files, engine="netcdf4", chunks=chunks)
         self.atmos_ds = self.atmos_ds.sel(latitude=self.atmos_ds["latitude"][:720])
         self.atmos_levels = tuple(
             int(level) for level in self.atmos_ds["pressure_level"].values
