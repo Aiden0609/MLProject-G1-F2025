@@ -36,7 +36,7 @@ locations["sh"] = -12.8700
 # normalization (yearly) standard deviations
 scales["sst"] = 10.301042
 scales["siconc"] = 0.32129946
-locations["sh"] = 12.011224
+scales["sh"] = 12.011224
 
 
 def sensible_heat(
@@ -72,19 +72,21 @@ def loss(
     """
     # TODO check if only last value of target is needed?
     # According to https://microsoft.github.io/aurora/batch.html#model-output, yes
-    surf_values = pred.surf_vars.values()
-    pred_sst = surf_values["sst"][-1]
-    pred_t2 = surf_values["2t"][-1]
-    pred_u10 = surf_values["10u"][-1]
-    pred_v10 = surf_values["10v"][-1]
-    pred_wind_speed = torch.sqrt(pred_u10**2, pred_v10**2)
+    pred_surf_values = pred.surf_vars#.values()
+    print(pred_surf_values["sst"].shape)
+    pred_sst = pred_surf_values["sst"][:,-1]
+    pred_t2 = pred_surf_values["2t"][:,-1]
+    pred_u10 = pred_surf_values["10u"][:,-1]
+    pred_v10 = pred_surf_values["10v"][:,-1]
+    pred_wind_speed = torch.sqrt(pred_u10**2 + pred_v10**2)
 
     # only the last value in target
-    target_sst = target["sst"][-1]
-    target_t2 = target["2t"][-1]
-    target_u10 = target["10u"][-1]
-    target_v10 = target["10v"][-1]
-    target_wind_speed = torch.sqrt(target_u10**2, target_v10**2)
+    target_surf_values = target.surf_vars
+    target_sst = target_surf_values["sst"][:,-1]
+    target_t2 = target_surf_values["2t"][:,-1]
+    target_u10 = target_surf_values["10u"][:,-1]
+    target_v10 = target_surf_values["10v"][:,-1]
+    target_wind_speed = torch.sqrt(target_u10**2 + target_v10**2)
 
     pred_sh = sensible_heat(pred_sst, pred_t2, pred_wind_speed)
     target_sh = sensible_heat(target_sst, target_t2, target_wind_speed)
@@ -146,8 +148,9 @@ dataset = SSTDataset(
     data_path, ["sst"], surface_variables=["2t", "10u", "10v", "msl", "sst", "siconc"]
 )
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
+BATCH_SIZE = 1
 dataloader = DataLoader(
-    dataset, batch_size=1, shuffle=True, pin_memory=True, collate_fn=dataset.collate_fn
+    dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, collate_fn=dataset.collate_fn
 )
 
 # pretrained_weights = torch.load()
@@ -182,7 +185,7 @@ model.encoder.surf_token_embeds.bias = nn.Parameter(new_bias)
 model.configure_activation_checkpointing()
 model.train()
 model = model.to(device)
-OVER_SIZE = 1 / (720 * 1440)
+OVER_SIZE = 1 / (720 * 1440 * BATCH_SIZE)
 
 opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
 scaler = torch.amp.GradScaler()
