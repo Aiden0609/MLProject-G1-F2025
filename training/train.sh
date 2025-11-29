@@ -36,6 +36,7 @@ source ~/ENVS/py311/bin/activate
 #    --num_workers 10 \
 #    --logdir ${logdir} \
 #    --data_dir  ${datadir}
+export "PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync"
 python ~/projects/def-lev/bmhod/training/finetuning_base.py
 
 echo "Job finished on $(date)"

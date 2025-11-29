@@ -28,15 +28,23 @@ model = AuroraPretrained(
 )
 
 # normalization (yearly) means
-locations["sst"] = 17.1771
-locations["siconc"] = 0.1589
-locations["sh"] = -12.8700
+# locations["sst"] = 17.1771
+# locations["siconc"] = 0.1589
+# locations["sh"] = -12.8700
+# normalization (yearly) mins
+locations["sst"] = -2.9454346
+locations["siconc"] = 0
+locations["sh"] = -119.40262
 
 
 # normalization (yearly) standard deviations
-scales["sst"] = 10.301042
-scales["siconc"] = 0.32129946
-scales["sh"] = 12.011224
+# scales["sst"] = 10.301042
+# scales["siconc"] = 0.32129946
+# scales["sh"] = 12.011224
+# normalization (yearly) min - maxs
+scales["sst"] = 34.638123
+scales["siconc"] = 1
+scales["sh"] = 160.31055
 
 
 def sensible_heat(
@@ -72,20 +80,20 @@ def loss(
     """
     # TODO check if only last value of target is needed?
     # According to https://microsoft.github.io/aurora/batch.html#model-output, yes
-    pred_surf_values = pred.surf_vars#.values()
-    pred_sst = pred_surf_values["sst"][:,-1]
-    pred_t2 = pred_surf_values["2t"][:,-1]
-    pred_u10 = pred_surf_values["10u"][:,-1]
-    pred_v10 = pred_surf_values["10v"][:,-1]
+    pred_surf_values = pred.surf_vars  # .values()
+    pred_sst = pred_surf_values["sst"][:, -1]
+    pred_t2 = pred_surf_values["2t"][:, -1]
+    pred_u10 = pred_surf_values["10u"][:, -1]
+    pred_v10 = pred_surf_values["10v"][:, -1]
     pred_wind_speed = torch.sqrt(pred_u10**2 + pred_v10**2)
 
     # only the last value in target
     target_surf_values = target.surf_vars
-    
-    target_sst = target_surf_values["sst"][:,-1]
-    target_t2 = target_surf_values["2t"][:,-1]
-    target_u10 = target_surf_values["10u"][:,-1]
-    target_v10 = target_surf_values["10v"][:,-1]
+
+    target_sst = target_surf_values["sst"][:, -1]
+    target_t2 = target_surf_values["2t"][:, -1]
+    target_u10 = target_surf_values["10u"][:, -1]
+    target_v10 = target_surf_values["10v"][:, -1]
     target_wind_speed = torch.sqrt(target_u10**2 + target_v10**2)
 
     pred_sh = sensible_heat(pred_sst, pred_t2, pred_wind_speed)
@@ -98,11 +106,11 @@ def loss(
     norm_target_sh = normalise_surf_var(target_sh, "sh", model.surf_stats)
     phys_loss_pre = abs(norm_pred_sh - norm_target_sh)
 
-    ice_cover = target_surf_values["siconc"][:,-1]
+    ice_cover = target_surf_values["siconc"][:, -1]
     # Removes latent heat for ocean covered by more than `ice_threshold` ice
     phys_loss_pre = torch.where(ice_cover > ice_threshold, torch.nan, phys_loss_pre)
 
-    phys_loss = torch.nanmean(phys_loss_pre) #* over_size
+    phys_loss = torch.nanmean(phys_loss_pre)  # * over_size
 
     mae_loss = nn.functional.mse_loss(norm_pred_sst, target_sst)
 
@@ -150,7 +158,11 @@ dataset = SSTDataset(
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True, collate_fn=collate_batches)
 BATCH_SIZE = 1
 dataloader = DataLoader(
-    dataset, batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, collate_fn=dataset.collate_fn
+    dataset,
+    batch_size=BATCH_SIZE,
+    shuffle=True,
+    pin_memory=True,
+    collate_fn=dataset.collate_fn,
 )
 
 # pretrained_weights = torch.load()

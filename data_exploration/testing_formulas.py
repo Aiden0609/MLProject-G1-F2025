@@ -125,8 +125,17 @@ with xr.open_dataset(
     # ishf = torch.from_numpy(era5_accum.variables["instant_sshf"].values)
     ishf = torch.from_numpy(era5_accum.variables["avg_ishf"].values)
     ishf = torch.where(custom_sh.isnan(), torch.nan, ishf)
-    print(torch.nanmean(ishf))
-    print(np.nanstd(ishf.numpy()))
+    min, max = np.nanmin(ishf.numpy()), np.nanmax(ishf.numpy())
+    location = min
+    scale = max - min
+    print(location, scale)
+    min, max = np.nanmin(sst.numpy()), np.nanmax(sst.numpy())
+    location = min
+    scale = max - min
+    print(location, scale)
+    # print(torch.min(ishf))
+    # print(np.nanstd(ishf.numpy()))
+    # print()
     delta_ishf = ishf - torch.roll(ishf, 1)
 
     fig = plt.figure(figsize=(16, 9))
