@@ -240,7 +240,7 @@ for epoch in range(10):
                 # Visualizations (every 100 steps)
                 if global_step % 100 == 0:
                     # Apply colormap and mask lands as white
-                    pred_vis = pred_sst[0].clone().cpu().numpy()
+                    pred_vis = pred_sst[0].detach().clone().cpu().numpy()
                     target_vis = target[0].clone().cpu().numpy()
                     mask_np = ocean_mask[0].cpu().numpy()
                     
@@ -365,7 +365,7 @@ for epoch in range(10):
                 # Log first validation sample of epoch
                 if val_sample_count == 1:
                     # Apply colormap and mask lands as white
-                    pred_vis = pred_sst[0].clone().cpu().numpy()
+                    pred_vis = pred_sst[0].detach().cpu().numpy()
                     target_vis = target[0].clone().cpu().numpy()
                     mask_np = ocean_mask[0].cpu().numpy()
                     
