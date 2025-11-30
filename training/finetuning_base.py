@@ -213,7 +213,7 @@ OVER_SIZE = 1 / (720 * 1440 * BATCH_SIZE)
 
 # opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
 opt = torch.optim.Adafactor(model.parameters(), lr=1e-3)
-# scaler = torch.amp.GradScaler()
+scaler = torch.amp.GradScaler()
 writer = SummaryWriter(log_dir="runs/sst_finetune")
 torch.cuda.empty_cache()
 global_step = 0
@@ -224,15 +224,15 @@ for epoch in range(4):
         target_batch: Batch
         opt.zero_grad()
         # offload_model_params(model, device)
-        with torch.amp.autocast(enabled=True):
-            prediction: Batch = model(input_batch.to(device))
-            loss_value: torch.Tensor = loss(prediction, target_batch.to(device), OVER_SIZE)
+        # with torch.amp.autocast(device_type=device.type, enabled=True):
+        prediction: Batch = model(input_batch.to(device))
+        loss_value: torch.Tensor = loss(prediction, target_batch.to(device), OVER_SIZE)
         # offload_model_params(model, "cpu")
-        loss_value.backward()
-        opt.step()
-        # scaler.scale(loss_value).backward()
-        # scaler.step(opt)
-        # scaler.update()
+        # loss_value.backward()
+        # opt.step()
+        scaler.scale(loss_value).backward()
+        scaler.step(opt)
+        scaler.update()
 
         writer.add_scalar("train/loss_step", loss_value.item(), global_step)
 
