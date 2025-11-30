@@ -106,9 +106,9 @@ def loss(
     norm_target_sh = normalise_surf_var(target_sh, "sh", model.surf_stats)
     phys_loss_pre = abs(norm_pred_sh - norm_target_sh)
 
-    ice_cover = target_surf_values["siconc"][:, -1]
-    # Removes latent heat for ocean covered by more than `ice_threshold` ice
-    phys_loss_pre = torch.where(ice_cover > ice_threshold, torch.nan, phys_loss_pre)
+    # ice_cover = target_surf_values["siconc"][:, -1]
+    # # Removes latent heat for ocean covered by more than `ice_threshold` ice
+    # phys_loss_pre = torch.where(ice_cover > ice_threshold, torch.nan, phys_loss_pre)
 
     phys_loss = torch.nanmean(phys_loss_pre)  # * over_size
 
@@ -116,6 +116,18 @@ def loss(
 
     return mae_loss + physics_loss_hyperparameter * phys_loss
 
+def offload_model_params(model: AuroraPretrained, device: str= "cpu"):
+    for name, param in model.named_parameters():
+        param.data = param.to(device)
+    # model.encoder.atmos_levels_embed.weight.data = model.encoder.atmos_levels_embed.weight.to(device, non_blocking=True)
+    # model.encoder.atmos_token_embeds.weights.data = model.encoder.atmos_token_embeds.weights.to(device, non_blocking=True)
+    
+    # # model.encoder.surf_level_encoding..data = model.encoder.surf_level_encoding.weight.to(device, non_blocking=True)
+    # for key, param in model.encoder.surf_token_embeds.weights.items(): 
+    #     param.data = model.encoder.surf_token_embeds.weights[key].to(device, non_blocking=True) 
+
+    # model.decoder.atmos_levels_embed.weight.data = model.decoder.atmos_levels_embed.weight.to(device, non_blocking=True)
+    
 
 # def collate_batches(batch_items) -> tuple[Batch, Batch]:
 #     batch
@@ -199,21 +211,28 @@ model.train()
 model = model.to(device)
 OVER_SIZE = 1 / (720 * 1440 * BATCH_SIZE)
 
-opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
-scaler = torch.amp.GradScaler()
+# opt = torch.optim.AdamW(model.parameters(), lr=1e-3)
+opt = torch.optim.Adafactor(model.parameters(), lr=1e-3)
+# scaler = torch.amp.GradScaler()
 writer = SummaryWriter(log_dir="runs/sst_finetune")
-
+torch.cuda.empty_cache()
 global_step = 0
 for epoch in range(4):
     for batch_idx, (input_batch, target_batch) in enumerate(dataloader):
+        print(epoch, batch_idx)
         input_batch: Batch
         target_batch: Batch
         opt.zero_grad()
-        prediction: Batch = model(input_batch.to(device))
-        loss_value: torch.Tensor = loss(prediction, target_batch.to(device), OVER_SIZE)
-        scaler.scale(loss_value).backward()
-        scaler.step(opt)
-        scaler.update()
+        # offload_model_params(model, device)
+        with torch.amp.autocast(enabled=True):
+            prediction: Batch = model(input_batch.to(device))
+            loss_value: torch.Tensor = loss(prediction, target_batch.to(device), OVER_SIZE)
+        # offload_model_params(model, "cpu")
+        loss_value.backward()
+        opt.step()
+        # scaler.scale(loss_value).backward()
+        # scaler.step(opt)
+        # scaler.update()
 
         writer.add_scalar("train/loss_step", loss_value.item(), global_step)
 

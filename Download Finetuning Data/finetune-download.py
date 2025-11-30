@@ -76,9 +76,13 @@ def print_dimensions(path) -> bool:
         print(f"    dims: {dict(ds.dims)}")
         ds.close()
         return True
+    except OSError as e:
+        print(f"    CORRUPT: file must be redownloaded")
+        os.remove(path)
+        return False
     except Exception as e:
         print(f"    CORRUPT: cannot open ({e})")
-        return False
+        return True
 
 
 # static data
@@ -121,7 +125,8 @@ for year in years:
         if out_file.exists():
             print(f"  exists: {out_file.name}")
             not_corrupt = print_dimensions(out_file)
-            continue
+            if not_corrupt:
+                continue
 
         print(f"  downloading {out_file.name}")
         start = time.time()
