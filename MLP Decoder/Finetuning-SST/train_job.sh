@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=07-00:00:00
+#SBATCH --time=04-00:00:00
 #SBATCH --account=def-weimin
 #SBATCH --mem=288000M
 #SBATCH --gpus=h100:1
