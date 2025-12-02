@@ -1,0 +1,129 @@
+Job Started on Mon Dec  1 18:47:34 PST 2025
+Mon Dec  1 18:47:34 2025       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.65.06              Driver Version: 580.65.06      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA H100 80GB HBM3          On  |   00000000:06:00.0 Off |                    0 |
+| N/A   21C    P0             66W /  700W |       5MiB /  81559MiB |      0%      Default |
+|                                         |                        |             Disabled |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_01.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_01.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_02.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_02.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_03.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_03.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_04.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_04.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_05.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_05.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_06.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_06.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_07.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_07.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_surface_2022_08.nc
+  Exists: True
+Checking: /scratch/mridul01/data/finetune-data-2020-2024/era5_atmospheric_2022_08.nc
+  Exists: True
+
+Test files found: 8 months
+
+Starting testing on 2022 data...
+History window: 2
+Sampling every 44th timestep
+
+Processing file 1/8: era5_surface_2022_01.nc
+  Total timesteps in file: 124
+  Will sample: [2, 46, 90]
+  Sample 1 (t=2): MAE=0.4531, Physics=0.008126, Total=0.4612
+  Sample 2 (t=46): MAE=0.4424, Physics=0.008124, Total=0.4505
+  Sample 3 (t=90): MAE=0.4384, Physics=0.008269, Total=0.4467
+
+Processing file 2/8: era5_surface_2022_02.nc
+  Total timesteps in file: 112
+  Will sample: [2, 46, 90]
+  Sample 4 (t=2): MAE=0.4516, Physics=0.008445, Total=0.4600
+  Sample 5 (t=46): MAE=0.4600, Physics=0.008340, Total=0.4684
+  Sample 6 (t=90): MAE=0.4406, Physics=0.008325, Total=0.4490
+
+Processing file 3/8: era5_surface_2022_03.nc
+  Total timesteps in file: 124
+  Will sample: [2, 46, 90]
+  Sample 7 (t=2): MAE=0.4364, Physics=0.008259, Total=0.4447
+  Sample 8 (t=46): MAE=0.4574, Physics=0.008355, Total=0.4658
+  Sample 9 (t=90): MAE=0.4402, Physics=0.008311, Total=0.4485
+
+Processing file 4/8: era5_surface_2022_04.nc
+  Total timesteps in file: 120
+  Will sample: [2, 46, 90]
+  Sample 10 (t=2): MAE=0.4580, Physics=0.008367, Total=0.4664
+  Sample 11 (t=46): MAE=0.4824, Physics=0.008700, Total=0.4911
+  Sample 12 (t=90): MAE=0.4974, Physics=0.008453, Total=0.5059
+
+Processing file 5/8: era5_surface_2022_05.nc
+  Total timesteps in file: 124
+  Will sample: [2, 46, 90]
+  Sample 13 (t=2): MAE=0.5594, Physics=0.008639, Total=0.5681
+  Sample 14 (t=46): MAE=0.6041, Physics=0.008619, Total=0.6127
+  Sample 15 (t=90): MAE=0.6770, Physics=0.009045, Total=0.6860
+
+Processing file 6/8: era5_surface_2022_06.nc
+  Total timesteps in file: 120
+  Will sample: [2, 46, 90]
+  Sample 16 (t=2): MAE=0.8324, Physics=0.009275, Total=0.8417
+  Sample 17 (t=46): MAE=0.8504, Physics=0.009031, Total=0.8594
+  Sample 18 (t=90): MAE=0.8568, Physics=0.009320, Total=0.8661
+
+Processing file 7/8: era5_surface_2022_07.nc
+  Total timesteps in file: 124
+  Will sample: [2, 46, 90]
+  Sample 19 (t=2): MAE=0.7881, Physics=0.009993, Total=0.7981
+  Sample 20 (t=46): MAE=0.7977, Physics=0.010569, Total=0.8082
+  Sample 21 (t=90): MAE=0.8524, Physics=0.009943, Total=0.8624
+
+Processing file 8/8: era5_surface_2022_08.nc
+  Total timesteps in file: 124
+  Will sample: [2, 46, 90]
+  Sample 22 (t=2): MAE=0.8043, Physics=0.009829, Total=0.8141
+  Sample 23 (t=46): MAE=0.7577, Physics=0.009402, Total=0.7671
+  Sample 24 (t=90): MAE=0.7393, Physics=0.008838, Total=0.7481
+
+================================================================================
+FINAL TEST RESULTS ON 2022 DATA
+================================================================================
+Total samples evaluated: 24
+
+Average MAE:           0.6074 K
+Average Physics Loss:  0.008857
+Average Total Loss:    0.6163
+================================================================================
+
+Results saved to: /scratch/mridul01/results/sst_test
+Done!
+Job finished on Mon Dec  1 19:08:20 PST 2025

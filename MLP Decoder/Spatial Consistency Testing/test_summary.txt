@@ -1,0 +1,6 @@
+SST Test Results on 2022 Data
+================================================================================
+Total samples: 24
+Average MAE: 0.6074 K
+Average Physics Loss: 0.008857
+Average Total Loss: 0.6163
