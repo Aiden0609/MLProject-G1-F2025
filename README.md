@@ -1,4 +1,4 @@
-# Physics-constrained Finetuning of Aurora, EO Foundation Model, for Sea Surface Temperature Forecasting
+# Finetuning of An Earth Foundation Model for Sea Surface Temperature Forecasting
 
 Code repo for the course project of Group 1, ECE-8936/ENGI-9882/COMP-6936 course
 ---
